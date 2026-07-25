@@ -1,0 +1,380 @@
+<!DOCTYPE html>
+<html lang="es">
+
+<head>
+    <meta charset="UTF-8">
+    <title>PichonCalendar</title>
+
+    <style>
+        body {
+            margin: 0;
+            font-family: Arial, sans-serif;
+            color: white;
+
+            background: url('https://images.unsplash.com/photo-1506744038136-46273834b3fb') no-repeat center center fixed;
+            background-size: cover;
+        }
+
+        .overlay {
+            background: rgba(0, 0, 0, 0.2);
+            min-height: 100vh;
+            display: flex;
+        }
+
+        /* Sidebar */
+        .sidebar {
+            width: 200px;
+            background: rgba(0, 0, 0, 0.85);
+            padding: 20px;
+        }
+
+        .tab {
+            padding: 10px;
+            background: black;
+            margin-bottom: 5px;
+            cursor: pointer;
+        }
+
+        .tab:hover {
+            background: #222;
+        }
+
+        /* Main */
+        .main {
+            flex: 1;
+            padding: 20px;
+        }
+
+        h1 {
+            margin-top: 0;
+        }
+
+        .grid {
+            display: grid;
+            gap: 10px;
+        }
+
+        .years {
+            grid-template-columns: repeat(4, 1fr);
+        }
+
+        .months {
+            grid-template-columns: repeat(3, 1fr);
+        }
+
+        .days {
+            grid-template-columns: repeat(7, 1fr);
+        }
+
+        .item {
+            background: black;
+            padding: 10px;
+            text-align: center;
+            cursor: pointer;
+        }
+
+        .item:hover {
+            background: #333;
+        }
+
+        .weekdays {
+            display: grid;
+            grid-template-columns: repeat(7, 1fr);
+            margin-bottom: 10px;
+            text-align: center;
+        }
+
+        .today {
+            background: #007BFF;
+            border: 2px solid #007BFF;
+        }
+
+        .event {
+            background: black;
+            padding: 10px;
+            margin-bottom: 10px;
+        }
+
+        .event-text {
+            margin-top: 5px;
+            display: none;
+        }
+
+        input,
+        textarea,
+        button {
+            width: 100%;
+            margin-top: 5px;
+            background: black;
+            color: white;
+            border: 1px solid white;
+            padding: 5px;
+        }
+    </style>
+
+</head>
+
+<body>
+
+    <div class="overlay">
+
+        <div class="sidebar">
+            <h2>PichonCalendar</h2>
+            <div class="tab" onclick="showYears()">Años</div>
+            <div class="tab" onclick="showMonths()">Meses</div>
+            <div class="tab" onclick="showDays()">Días</div>
+            <div class="tab" onclick="showEvents()">Eventos</div>
+        </div>
+
+        <div class="main">
+            <h1>PichonCalendar</h1>
+            <div id="app"></div>
+        </div>
+
+    </div>
+
+    <script>
+        const app = document.getElementById("app");
+
+        /* FECHA ARGENTINA */
+        function getArgentinaDate() {
+            const now = new Date();
+            return new Date(now.toLocaleString("en-US", { timeZone: "America/Argentina/Buenos_Aires" }));
+        }
+
+        let today = getArgentinaDate();
+
+        let baseYear = today.getFullYear();
+
+        let currentYear = baseYear;
+        let currentMonth = today.getMonth();
+        let currentDay = today.getDate();
+
+        const months = ["Enero", "Febrero", "Marzo", "Abril", "Mayo", "Junio", "Julio", "Agosto", "Septiembre", "Octubre", "Noviembre", "Diciembre"];
+        const weekdays = ["lun", "mar", "mié", "jue", "vie", "sáb", "dom"];
+
+        /* STORAGE */
+        function getEvents() {
+            return JSON.parse(localStorage.getItem("events") || "{}");
+        }
+        function saveEvents(e) {
+            localStorage.setItem("events", JSON.stringify(e));
+        }
+
+        /* ===================== VISTAS ===================== */
+
+        function showYears() {
+            baseYear = getArgentinaDate().getFullYear();
+
+            let html = "<div class='grid years'>";
+
+            for (let y = baseYear; y <= baseYear + 10; y++) {
+                html += `<div class="item" onclick="currentYear=${y}; showMonths()">${y}</div>`;
+            }
+
+            html += "</div>";
+            app.innerHTML = html;
+        }
+
+        function showMonths() {
+            let html = `<h2>${currentYear}</h2><div class="grid months">`;
+
+            months.forEach((m, i) => {
+                html += `<div class="item" onclick="showDays(currentYear, ${i})">${m}</div>`;
+            });
+
+            html += "</div>";
+            app.innerHTML = html;
+        }
+
+        function daysInMonth(y, m) {
+            return new Date(y, m + 1, 0).getDate();
+        }
+
+        function firstDay(y, m) {
+            let d = new Date(y, m, 1).getDay();
+            return d === 0 ? 6 : d - 1;
+        }
+
+        function showDays(year = currentYear, month = currentMonth) {
+
+            currentYear = year;
+            currentMonth = month;
+
+            let total = daysInMonth(year, month);
+            let start = firstDay(year, month);
+
+            let today = getArgentinaDate();
+
+            let html = `<h2>${months[month]} ${year}</h2>`;
+            html += `<div class="weekdays">${weekdays.map(d => `<div>${d}</div>`).join("")}</div>`;
+            html += `<div class="grid days">`;
+
+            for (let i = 0; i < start; i++) {
+                html += "<div></div>";
+            }
+
+            for (let d = 1; d <= total; d++) {
+
+                let isToday =
+                    d === today.getDate() &&
+                    month === today.getMonth() &&
+                    year === today.getFullYear();
+
+                html += `<div class="item ${isToday ? 'today' : ''}" onclick="openDay(${d})">${d}</div>`;
+            }
+
+            html += "</div>";
+            app.innerHTML = html;
+        }
+
+        function openDay(day) {
+            currentDay = day;
+
+            const events = getEvents();
+            const key = `${currentYear}-${currentMonth}-${day}`;
+            const ev = events[key] || { title: "", text: "" };
+
+            app.innerHTML = `
+        <h2>${day} ${months[currentMonth]} ${currentYear}</h2>
+
+        <input id="title" placeholder="Nombre del evento" value="${ev.title}">
+        <textarea id="text">${ev.text}</textarea>
+
+        <button onclick="saveEvent()">Guardar</button>
+    `;
+        }
+
+        function saveEvent() {
+            const events = getEvents();
+            const key = `${currentYear}-${currentMonth}-${currentDay}`;
+
+            events[key] = {
+                title: document.getElementById("title").value,
+                text: document.getElementById("text").value
+            };
+
+            saveEvents(events);
+            alert("Guardado");
+        }
+
+        /* ===================== EVENTOS ===================== */
+
+        function showEvents() {
+            const events = getEvents();
+
+            let html = `
+        <h2>Eventos</h2>
+
+        <h3>Agregar evento</h3>
+
+        <input id="evTitle" placeholder="Nombre del evento">
+        <input id="evDate" placeholder="Fecha (DD/MM/AAAA)">
+        <textarea id="evText" placeholder="Descripción"></textarea>
+
+        <button onclick="addEvent()">Agregar</button>
+
+        <hr>
+    `;
+
+            let i = 0;
+
+            for (let key in events) {
+                const ev = events[key];
+                const id = "ev" + i;
+
+                html += `
+        <div class="event">
+            <b>${ev.title || "(Sin nombre)"}</b><br>
+            ${key}
+
+            <button onclick="toggleEvent('${id}')">Ver/Ocultar</button>
+            <button onclick="editEvent('${key}')">Editar</button>
+            <button onclick="deleteEvent('${key}')">Eliminar</button>
+
+            <div id="${id}" class="event-text">${ev.text}</div>
+        </div>
+        `;
+                i++;
+            }
+
+            app.innerHTML = html;
+        }
+
+        function toggleEvent(id) {
+            const el = document.getElementById(id);
+            el.style.display = el.style.display === "block" ? "none" : "block";
+        }
+        function addEvent() {
+            const title = document.getElementById("evTitle").value;
+            const date = document.getElementById("evDate").value;
+            const text = document.getElementById("evText").value;
+
+            const parts = date.split("/");
+
+            if (parts.length !== 3) {
+                alert("Usá formato DD/MM/AAAA");
+                return;
+            }
+
+            const key = `${parts[2]}-${parseInt(parts[1]) - 1}-${parseInt(parts[0])}`;
+
+            const events = getEvents();
+            events[key] = { title, text };
+
+            saveEvents(events);
+            showEvents();
+        }
+        function editEvent(key) {
+            const events = getEvents();
+            const ev = events[key];
+            const [y, m, d] = key.split("-");
+
+            currentYear = parseInt(y);
+            currentMonth = parseInt(m);
+            currentDay = parseInt(d);
+
+            app.innerHTML = `
+        <h2>Editar evento</h2>
+
+        <input id="title" value="${ev.title}">
+        <textarea id="text">${ev.text}</textarea>
+
+        <button onclick="saveEditedEvent('${key}')">Guardar cambios</button>
+    `;
+        }
+
+        function saveEditedEvent(oldKey) {
+            const events = getEvents();
+
+            delete events[oldKey];
+
+            const newKey = `${currentYear}-${currentMonth}-${currentDay}`;
+
+            events[newKey] = {
+                title: document.getElementById("title").value,
+                text: document.getElementById("text").value
+            };
+
+            saveEvents(events);
+            showEvents();
+        }
+        function deleteEvent(key) {
+            const ok = confirm("¿Seguro que querés borrar este evento?");
+
+            if (!ok) return;
+
+            const events = getEvents();
+            delete events[key];
+            saveEvents(events);
+
+            showEvents();
+        }
+        /* ===================== INICIO ===================== */
+
+        showDays(currentYear, currentMonth);
+    </script>
+
+</body>
+
+</html>

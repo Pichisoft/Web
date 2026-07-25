@@ -1,0 +1,443 @@
+<!DOCTYPE html>
+<html lang="es">
+
+<head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>PichonDocs</title>
+
+    <style>
+        body {
+            margin: 0;
+            display: flex;
+            height: 100vh;
+            font-family: Arial;
+            background: #111;
+            color: #eee;
+        }
+
+        /* SIDEBAR */
+        .sidebar {
+            width: 270px;
+            background: #1b1b1b;
+            padding: 10px;
+            overflow-y: auto;
+            border-right: 1px solid #333;
+        }
+
+        .note {
+            padding: 10px;
+            margin: 6px 0;
+            background: #2a2a2a;
+            border-radius: 8px;
+            cursor: pointer;
+        }
+
+        .note.active {
+            outline: 2px solid #555;
+        }
+
+        /* MAIN */
+        .main {
+            flex: 1;
+            display: flex;
+            flex-direction: column;
+        }
+
+        .toolbar {
+            display: flex;
+            gap: 10px;
+            padding: 10px;
+            background: #1b1b1b;
+            border-bottom: 1px solid #333;
+
+        }
+
+        button,
+        input {
+            background: #222;
+            color: #eee;
+            border: 1px solid #444;
+            border-radius: 6px;
+            padding: 6px;
+            cursor: pointer;
+        }
+
+        textarea {
+            flex: 1;
+            padding: 15px;
+            font-size: 15px;
+            border: none;
+            outline: none;
+            background: #111;
+            color: #ddd;
+        }
+
+        .titleWrap {
+            padding: 10px 15px;
+        }
+
+        .titleText {
+            font-size: 18px;
+            font-weight: bold;
+            outline: none;
+        }
+
+        /* 🎨 PALETTE */
+        .palette {
+            display: flex;
+            gap: 6px;
+            padding: 0 10px 10px 10px;
+        }
+
+        .colorBtn {
+            width: 18px;
+            height: 18px;
+            border-radius: 50%;
+            cursor: pointer;
+            border: 2px solid transparent;
+        }
+
+        .selected {
+            border: 2px solid #fff;
+        }
+
+        /* 🔐 AUTH */
+        .modal {
+            position: fixed;
+            inset: 0;
+            background: rgba(0, 0, 0, 0.92);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            z-index: 9999;
+        }
+
+        .box {
+            background: #1b1b1b;
+            padding: 20px;
+            border-radius: 10px;
+            width: 320px;
+            text-align: center;
+        }
+
+        .box input {
+            width: 100%;
+            margin: 5px 0;
+        }
+
+        .link {
+            font-size: 12px;
+            color: #aaa;
+            cursor: pointer;
+            display: block;
+            margin-top: 6px;
+        }
+
+        .danger {
+            background: #b91c1c;
+            margin-top: 8px;
+        }
+    </style>
+</head>
+
+<body>
+
+    <!-- 🔐 LOGIN -->
+    <div class="modal" id="authModal">
+
+        <div class="box">
+
+            <h3>PichonDocs</h3>
+
+            <!-- LOGIN -->
+            <div id="loginBox">
+                <p>Iniciar sesión</p>
+                <input id="loginUser" placeholder="Usuario" />
+                <input id="loginPass" type="password" placeholder="Contraseña" />
+                <button onclick="login()">Entrar</button>
+
+                <span class="link" onclick="showRegister()">Crear cuenta</span>
+                <span class="link" onclick="resetAll()">Restablecer datos</span>
+            </div>
+
+            <!-- REGISTER -->
+            <div id="registerBox" style="display:none;">
+                <p>Crear cuenta</p>
+                <input id="regUser" placeholder="Usuario único" />
+                <input id="regPass" type="password" placeholder="Contraseña" />
+                <button onclick="register()">Crear cuenta</button>
+
+                <span class="link" onclick="showLogin()">Volver</span>
+            </div>
+
+        </div>
+
+    </div>
+
+    <!-- APP -->
+    <div class="sidebar">
+        <button onclick="newNote()">+ Nueva nota</button>
+        <div id="list"></div>
+    </div>
+
+    <div class="main">
+
+        <div class="toolbar">
+            <div class="toolbar"> </div>
+            <button onclick="downloadTXT()">⬇ TXT</button>
+            <button onclick="saveNote()">💾 Guardar</button>
+            <button onclick="deleteNote()">🗑️ Eliminar</button>
+        </div>
+
+        <!-- 🎨 PALETTE RESTAURADA -->
+        <div class="palette" id="palette"></div>
+
+        <div class="titleWrap">
+            <div id="titleView" class="titleText" contenteditable="true"></div>
+        </div>
+
+        <textarea id="content"></textarea>
+
+    </div>
+
+    <script>
+
+        let currentUser = null;
+        let notes = [];
+        let currentId = null;
+
+        /* 🎨 COLORS */
+        const colors = [
+            "#666666", "#ffffff", "#a855f7",
+            "#3b82f6", "#22c55e", "#eab308", "#ef4444"
+        ];
+
+        let selectedColor = colors[0];
+
+        /* USERS */
+        function getUsers() {
+            return JSON.parse(localStorage.getItem("pichon_users") || "[]");
+        }
+
+        function saveUsers(u) {
+            localStorage.setItem("pichon_users", JSON.stringify(u));
+        }
+
+        /* NOTES KEY */
+        function key() {
+            return "pichon_notes_" + currentUser;
+        }
+
+        /* ================= LOGIN ================= */
+
+        function login() {
+            let u = loginUser.value.trim();
+            let p = loginPass.value;
+
+            let users = getUsers();
+            let found = users.find(x => x.user === u);
+
+            if (!found) return alert("Usuario incorrecto");
+            if (found.pass !== p) return alert("Contraseña incorrecta");
+
+            currentUser = u;
+            start();
+        }
+
+        /* ================= REGISTER ================= */
+
+        function register() {
+            let u = regUser.value.trim();
+            let p = regPass.value;
+
+            if (!u || !p) return alert("Completar campos");
+
+            let users = getUsers();
+
+            if (users.find(x => x.user === u)) {
+                return alert("Ese usuario ya existe");
+            }
+
+            users.push({ user: u, pass: p });
+            saveUsers(users);
+
+            alert("Cuenta creada");
+            showLogin();
+        }
+
+        /* ================= RESET ================= */
+
+        function resetAll() {
+            if (!confirm("Esto borra TODO (usuarios + notas)")) return;
+
+            localStorage.clear();
+            location.reload();
+        }
+
+        /* ================= UI ================= */
+
+        function showRegister() {
+            loginBox.style.display = "none";
+            registerBox.style.display = "block";
+        }
+
+        function showLogin() {
+            loginBox.style.display = "block";
+            registerBox.style.display = "none";
+        }
+
+        /* ================= SESSION ================= */
+
+        function start() {
+            authModal.style.display = "none";
+
+            notes = JSON.parse(localStorage.getItem(key()) || "[]");
+
+            render();
+
+            if (notes.length) loadNote(notes[0].id);
+
+            renderPalette();
+        }
+
+        /* ================= NOTES ================= */
+
+        function saveStorage() {
+            localStorage.setItem(key(), JSON.stringify(notes));
+        }
+
+        function newNote() {
+            let n = {
+                id: Date.now(),
+                title: "Nueva nota",
+                content: "",
+                color: selectedColor
+            };
+
+            notes.push(n);
+            currentId = n.id;
+
+            saveStorage();
+            render();
+            loadNote(n.id);
+        }
+
+        function loadNote(id) {
+            let n = notes.find(x => x.id === id);
+            if (!n) return;
+
+            currentId = id;
+
+            titleView.innerText = n.title;
+            content.value = n.content;
+
+            selectedColor = n.color || "#666666";
+
+            titleView.style.color = selectedColor;
+
+            renderPalette();
+            render();
+        }
+
+        function saveNote() {
+            let n = notes.find(x => x.id === currentId);
+            if (!n) return;
+
+            n.title = titleView.innerText;
+            n.content = content.value;
+            n.color = selectedColor;
+
+            saveStorage();
+            render();
+        }
+
+        function deleteNote() {
+            let n = notes.find(x => x.id === currentId);
+            if (!n) return;
+
+            let ok = confirm(`¿Querés eliminar la nota "${n.title}"? Esta acción no se puede deshacer.`);
+
+            if (!ok) return;
+
+            notes = notes.filter(x => x.id !== currentId);
+            saveStorage();
+
+            currentId = null;
+
+            render();
+
+            if (notes.length > 0) {
+                loadNote(notes[0].id);
+            } else {
+                titleView.innerText = "";
+                content.value = "";
+            }
+        }
+        /* ================= RENDER ================= */
+
+        function render() {
+            list.innerHTML = "";
+
+            notes.forEach(n => {
+                let div = document.createElement("div");
+                div.className = "note";
+                div.innerText = n.title;
+                div.style.color = n.color;
+                div.onclick = () => loadNote(n.id);
+                list.appendChild(div);
+            });
+        }
+
+        /* ================= 🎨 PALETTE ================= */
+
+        function renderPalette() {
+            palette.innerHTML = "";
+
+            colors.forEach(c => {
+                let b = document.createElement("div");
+                b.className = "colorBtn" + (c === selectedColor ? " selected" : "");
+                b.style.background = c;
+
+                b.onclick = () => {
+                    selectedColor = c;
+
+                    let n = notes.find(x => x.id === currentId);
+                    if (n) {
+                        n.color = c;
+                        titleView.style.color = c;
+                        saveStorage();
+                    }
+
+                    renderPalette();
+                    render();
+                };
+
+                palette.appendChild(b);
+            });
+        }
+        function downloadTXT() {
+            let n = notes.find(x => x.id === currentId);
+            if (!n) return;
+
+            const text = `${n.title}\n\n${n.content}`;
+
+            const blob = new Blob([text], { type: "text/plain" });
+            const url = URL.createObjectURL(blob);
+
+            const a = document.createElement("a");
+            a.href = url;
+            a.download = (n.title || "nota") + ".txt";
+            a.click();
+
+            URL.revokeObjectURL(url);
+        }
+
+        /* INIT */
+        authModal.style.display = "flex";
+
+    </script>
+
+</body>
+
+</html>
