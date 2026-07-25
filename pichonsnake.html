@@ -1,0 +1,813 @@
+<!DOCTYPE html>
+<html lang="es">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>PichonSnake</title>
+    <style>
+        * {
+            box-sizing: border-box;
+        }
+
+        body {
+            background: #111;
+            color: white;
+            text-align: center;
+            font-family: Arial, sans-serif;
+            padding-bottom: 40px;
+        }
+
+        canvas {
+            background: #222;
+            border: 2px solid #555;
+            margin-top: 10px;
+            max-width: 90vw;
+            height: auto;
+        }
+
+        #score,
+        #highscore {
+            margin-top: 8px;
+            font-size: 18px;
+        }
+
+        #scoreboard {
+            display: flex;
+            justify-content: center;
+            gap: 30px;
+            flex-wrap: wrap;
+        }
+
+        button#startBtn {
+            margin-top: 10px;
+            padding: 8px 16px;
+            cursor: pointer;
+        }
+
+        /* ---------- Pestañas de modo ---------- */
+        #tabs {
+            position: relative;
+            display: flex;
+            justify-content: center;
+            margin-top: 25px;
+            border-top: 1px solid #333;
+            padding-top: 10px;
+        }
+
+        .tab {
+            padding: 10px 18px;
+            cursor: pointer;
+            font-size: 16px;
+            color: #ccc;
+            border-bottom: 3px solid transparent;
+            transition: color 0.2s, border-color 0.2s;
+            user-select: none;
+        }
+
+        .tab:hover {
+            color: white;
+        }
+
+        .tab.active {
+            color: white;
+            border-bottom: 3px solid #2196f3;
+            font-weight: bold;
+        }
+
+        /* ---------- Panel "¿Cómo se juega?" ---------- */
+        #howToPlay {
+            display: none;
+            max-width: 480px;
+            margin: 15px auto 0 auto;
+            background: #1b1b1b;
+            border: 1px solid #333;
+            border-radius: 8px;
+            padding: 15px 20px;
+            text-align: left;
+            font-size: 15px;
+            line-height: 1.5;
+        }
+
+        #howToPlay h3 {
+            margin-top: 0;
+            color: #4caf50;
+        }
+
+        #howToPlay .device-tag {
+            display: inline-block;
+            background: #2196f3;
+            color: white;
+            padding: 2px 8px;
+            border-radius: 4px;
+            font-size: 12px;
+            margin-bottom: 6px;
+        }
+
+        /* ---------- Cartel de Game Over propio ---------- */
+        #gameOverOverlay {
+            display: none;
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: rgba(0, 0, 0, 0.75);
+            z-index: 999;
+            align-items: center;
+            justify-content: center;
+        }
+
+        #gameOverCard {
+            background: linear-gradient(160deg, #1b1b1b, #222);
+            border: 3px solid #2e7d32;
+            border-radius: 14px;
+            padding: 30px 40px;
+            box-shadow: 0 0 30px rgba(46, 125, 50, 0.5);
+            animation: popIn 0.25s ease-out;
+            max-width: 90vw;
+        }
+
+        @keyframes popIn {
+            from {
+                transform: scale(0.8);
+                opacity: 0;
+            }
+
+            to {
+                transform: scale(1);
+                opacity: 1;
+            }
+        }
+
+        #gameOverCard h2 {
+            margin: 0 0 10px 0;
+            font-size: 28px;
+            color: #ff5252;
+            text-shadow: 0 0 10px rgba(255, 82, 82, 0.6);
+        }
+
+        #gameOverCard p {
+            margin: 6px 0;
+            font-size: 17px;
+        }
+
+        #gameOverCard .winner-line {
+            color: #66bb6a;
+            font-weight: bold;
+            font-size: 19px;
+        }
+
+        #gameOverCard button {
+            margin-top: 15px;
+            padding: 10px 22px;
+            font-size: 15px;
+            cursor: pointer;
+            background: #2e7d32;
+            color: white;
+            border: none;
+            border-radius: 6px;
+        }
+
+        #gameOverCard button:hover {
+            background: #388e3c;
+        }
+
+        /* ---------- Cuenta regresiva ---------- */
+        #countdownOverlay {
+            display: none;
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: rgba(0, 0, 0, 0.6);
+            z-index: 998;
+            align-items: center;
+            justify-content: center;
+        }
+
+        #countdownText {
+            font-size: 90px;
+            font-weight: bold;
+            color: #4caf50;
+            text-shadow: 0 0 25px rgba(76, 175, 80, 0.8);
+            animation: countdownPulse 1s ease-in-out;
+        }
+
+        #countdownText.countdown-go {
+            font-size: 56px;
+            color: #ff5252;
+            text-shadow: 0 0 25px rgba(255, 82, 82, 0.8);
+        }
+
+        @keyframes countdownPulse {
+            0% {
+                transform: scale(0.5);
+                opacity: 0;
+            }
+
+            50% {
+                transform: scale(1.15);
+                opacity: 1;
+            }
+
+            100% {
+                transform: scale(1);
+                opacity: 1;
+            }
+        }
+
+        /* ---------- Panel "Ajustes" ---------- */
+        #ajustesPanel {
+            display: none;
+            max-width: 480px;
+            margin: 15px auto 0 auto;
+            background: #1b1b1b;
+            border: 1px solid #333;
+            border-radius: 8px;
+            padding: 15px 20px;
+            text-align: left;
+            font-size: 15px;
+            line-height: 1.5;
+        }
+
+        #ajustesPanel h3 {
+            margin-top: 0;
+            color: #4caf50;
+        }
+
+        .setting-row {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            padding: 10px 0;
+            border-top: 1px solid #2a2a2a;
+        }
+
+        .setting-row:first-of-type {
+            border-top: none;
+        }
+
+        /* Interruptor estilo switch */
+        .switch {
+            position: relative;
+            display: inline-block;
+            width: 46px;
+            height: 24px;
+            flex-shrink: 0;
+        }
+
+        .switch input {
+            opacity: 0;
+            width: 0;
+            height: 0;
+        }
+
+        .switch .slider {
+            position: absolute;
+            cursor: pointer;
+            top: 0;
+            left: 0;
+            right: 0;
+            bottom: 0;
+            background-color: #555;
+            border-radius: 24px;
+            transition: background-color 0.2s;
+        }
+
+        .switch .slider::before {
+            position: absolute;
+            content: "";
+            height: 18px;
+            width: 18px;
+            left: 3px;
+            bottom: 3px;
+            background-color: white;
+            border-radius: 50%;
+            transition: transform 0.2s;
+        }
+
+        .switch input:checked+.slider {
+            background-color: #2e7d32;
+        }
+
+        .switch input:checked+.slider::before {
+            transform: translateX(22px);
+        }
+
+        /* ---------- Controles digitales (móvil / tablet / PlayStation) ---------- */
+        .dpad {
+            position: fixed;
+            bottom: 20px;
+            display: none;
+            grid-template-columns: 50px 50px 50px;
+            grid-template-rows: 50px 50px 50px;
+            gap: 4px;
+            z-index: 500;
+        }
+
+        .dpad.show {
+            display: grid;
+        }
+
+        #dpadP1 {
+            left: 15px;
+        }
+
+        #dpadP2 {
+            right: 15px;
+        }
+
+        .dpad button {
+            width: 50px;
+            height: 50px;
+            font-size: 20px;
+            background: rgba(76, 175, 80, 0.25);
+            border: 1px solid #4caf50;
+            color: white;
+            border-radius: 8px;
+            cursor: pointer;
+            touch-action: manipulation;
+        }
+
+        .dpad button:active {
+            background: rgba(76, 175, 80, 0.6);
+        }
+
+        #dpadP2 button {
+            background: rgba(33, 150, 243, 0.25);
+            border: 1px solid #2196f3;
+        }
+
+        #dpadP2 button:active {
+            background: rgba(33, 150, 243, 0.6);
+        }
+
+        .dpad-up {
+            grid-column: 2;
+            grid-row: 1;
+        }
+
+        .dpad-left {
+            grid-column: 1;
+            grid-row: 2;
+        }
+
+        .dpad-right {
+            grid-column: 3;
+            grid-row: 2;
+        }
+
+        .dpad-down {
+            grid-column: 2;
+            grid-row: 3;
+        }
+    </style>
+</head>
+
+<body>
+
+    <h1>🐍 Snake</h1>
+
+    <div id="scoreboard">
+        <div id="score">Puntos: 0</div>
+        <div id="score2" style="display:none;">Puntos J2: 0</div>
+        <div id="highscore">Récord: 0</div>
+    </div>
+
+    <button id="startBtn" onclick="startGame()">Empezar</button>
+    <br>
+    <canvas id="game" width="400" height="400"></canvas>
+
+    <!-- Pestañas -->
+    <div id="tabs">
+        <div class="tab active" id="tabSolo" onclick="selectTab('solo')">Juego Solitario</div>
+        <div class="tab" id="tab1v1" onclick="selectTab('1v1')">Modo 1v1</div>
+        <div class="tab" id="tabHelp" onclick="selectTab('help')">¿Cómo se juega?</div>
+        <div class="tab" id="tabAjustes" onclick="selectTab('ajustes')">Ajustes</div>
+    </div>
+
+    <!-- Panel de instrucciones -->
+    <div id="howToPlay"></div>
+
+    <!-- Panel de ajustes -->
+    <div id="ajustesPanel">
+        <h3>Ajustes</h3>
+        <div class="setting-row">
+            <span>Cuenta regresiva</span>
+            <label class="switch">
+                <input type="checkbox" id="toggleCountdown" onchange="toggleCountdownSetting(this.checked)">
+                <span class="slider"></span>
+            </label>
+        </div>
+    </div>
+
+    <!-- Cartel de Game Over -->
+    <div id="gameOverOverlay">
+        <div id="gameOverCard">
+            <h2>💀 Game Over</h2>
+            <p id="gameOverText"></p>
+            <button onclick="closeGameOver()">Cerrar</button>
+        </div>
+    </div>
+
+    <!-- Cuenta regresiva antes de empezar -->
+    <div id="countdownOverlay">
+        <div id="countdownText">3</div>
+    </div>
+
+    <!-- Controles digitales Jugador 1 (abajo izquierda) -->
+    <div class="dpad" id="dpadP1">
+        <button class="dpad-up" onclick="setDirButton(1,'up')">▲</button>
+        <button class="dpad-left" onclick="setDirButton(1,'left')">◀</button>
+        <button class="dpad-right" onclick="setDirButton(1,'right')">▶</button>
+        <button class="dpad-down" onclick="setDirButton(1,'down')">▼</button>
+    </div>
+
+    <!-- Controles digitales Jugador 2 (abajo derecha) -->
+    <div class="dpad" id="dpadP2">
+        <button class="dpad-up" onclick="setDirButton(2,'up')">▲</button>
+        <button class="dpad-left" onclick="setDirButton(2,'left')">◀</button>
+        <button class="dpad-right" onclick="setDirButton(2,'right')">▶</button>
+        <button class="dpad-down" onclick="setDirButton(2,'down')">▼</button>
+    </div>
+
+    <script>
+        const canvas = document.getElementById("game");
+        const ctx = canvas.getContext("2d");
+
+        const gridSize = 20;
+        let snake, direction, food, score, gameLoop;
+        let snake2, direction2, score2;
+        let mode = "solo"; // "solo" | "1v1"
+
+        // Velocidad: arranca más lenta y va subiendo de a poco
+        const INITIAL_SPEED = 160; // ms entre movimientos (más alto = más lento)
+        const MIN_SPEED = 70;      // velocidad máxima (más bajo = más rápido)
+        const SPEED_STEP = 4;      // cuánto baja el intervalo cada vez que sube la velocidad
+        const SPEED_UP_EVERY_TICKS = 25; // cada cuántos "update" sube la velocidad
+        let currentSpeed = INITIAL_SPEED;
+        let tickCount = 0;
+
+        // cargar récord
+        let highScore = localStorage.getItem("snakeHighScore") || 0;
+        document.getElementById("highscore").textContent = "Récord: " + highScore;
+
+        // ---------------- Ajustes ----------------
+        let settings = {
+            countdownEnabled: localStorage.getItem("snakeCountdownEnabled") !== "false"
+        };
+        document.getElementById("toggleCountdown").checked = settings.countdownEnabled;
+
+        function toggleCountdownSetting(checked) {
+            settings.countdownEnabled = checked;
+            localStorage.setItem("snakeCountdownEnabled", checked);
+        }
+
+        /* ---------------- Detección de dispositivo ---------------- */
+        function detectDevice() {
+            const ua = navigator.userAgent || "";
+            const isPlayStation = /PlayStation/i.test(ua);
+            const isMobileOrTablet = /Android|iPhone|iPad|iPod|Mobile|Tablet/i.test(ua) ||
+                (navigator.maxTouchPoints && navigator.maxTouchPoints > 1 && /Mac/i.test(ua)); // iPadOS a veces se reporta como Mac
+            if (isPlayStation) return "playstation";
+            if (isMobileOrTablet) return "movil";
+            return "pc";
+        }
+
+        const deviceType = detectDevice();
+        const usesTouchControls = (deviceType === "movil" || deviceType === "playstation");
+
+        /* ---------------- Pestañas ---------------- */
+        function selectTab(tab) {
+            document.getElementById("tabSolo").classList.remove("active");
+            document.getElementById("tab1v1").classList.remove("active");
+            document.getElementById("tabHelp").classList.remove("active");
+            document.getElementById("tabAjustes").classList.remove("active");
+            document.getElementById("howToPlay").style.display = "none";
+            document.getElementById("ajustesPanel").style.display = "none";
+
+            if (tab === "solo") {
+                document.getElementById("tabSolo").classList.add("active");
+                mode = "solo";
+                document.getElementById("score").style.display = "block";
+                document.getElementById("score2").style.display = "none";
+            } else if (tab === "1v1") {
+                document.getElementById("tab1v1").classList.add("active");
+                mode = "1v1";
+                document.getElementById("score").style.display = "none";
+                document.getElementById("score2").style.display = "none";
+            } else if (tab === "help") {
+                document.getElementById("tabHelp").classList.add("active");
+                document.getElementById("howToPlay").style.display = "block";
+                renderHowToPlay();
+            } else if (tab === "ajustes") {
+                document.getElementById("tabAjustes").classList.add("active");
+                document.getElementById("ajustesPanel").style.display = "block";
+            }
+            updateDpadVisibility();
+        }
+
+        function renderHowToPlay() {
+            const panel = document.getElementById("howToPlay");
+            let deviceLabel = deviceType === "movil" ? "Móvil / Tablet / iPad" :
+                deviceType === "playstation" ? "PlayStation" : "PC";
+
+            let html = `<h3>¿Cómo se juega?</h3>
+                <span class="device-tag">Dispositivo detectado: ${deviceLabel}</span>`;
+
+            if (usesTouchControls) {
+                html += `
+                    <p><strong>Juego Solitario:</strong> usá las flechitas digitales que aparecen en la esquina inferior izquierda de la pantalla para mover la serpiente.</p>
+                    <p><strong>Modo 1v1:</strong></p>
+                    <p>🟢 Jugador 1: flechitas digitales en la esquina <strong>inferior izquierda</strong>.</p>
+                    <p>🔵 Jugador 2: flechitas digitales en la esquina <strong>inferior derecha</strong>.</p>`;
+            } else {
+                html += `
+                    <p><strong>Juego Solitario:</strong> movete con las flechas del teclado (↑ ↓ ← →).</p>
+                    <p><strong>Modo 1v1:</strong></p>
+                    <p>🟢 Jugador 1: teclas <strong>W A S D</strong>.</p>
+                    <p>🔵 Jugador 2: flechas del teclado <strong>↑ ↓ ← →</strong>.</p>`;
+            }
+
+            panel.innerHTML = html;
+        }
+
+        function updateDpadVisibility() {
+            const dpadP1 = document.getElementById("dpadP1");
+            const dpadP2 = document.getElementById("dpadP2");
+
+            dpadP1.classList.remove("show");
+            dpadP2.classList.remove("show");
+
+            if (!usesTouchControls) return;
+
+            if (mode === "solo") {
+                dpadP1.classList.add("show");
+            } else if (mode === "1v1") {
+                dpadP1.classList.add("show");
+                dpadP2.classList.add("show");
+            }
+        }
+
+        /* ---------------- Juego ---------------- */
+        function startGame() {
+            clearInterval(gameLoop);
+            clearInterval(countdownInterval);
+
+            snake = [{ x: 10, y: 10 }];
+            direction = { x: 1, y: 0 };
+            score = 0;
+            document.getElementById("score").textContent = "Puntos: 0";
+
+            if (mode === "1v1") {
+                snake2 = [{ x: 5, y: 5 }];
+                direction2 = { x: -1, y: 0 };
+                score2 = 0;
+                // En 1v1 no hay puntaje por comida: es PvP, gana el que no choca
+                document.getElementById("score").style.display = "none";
+                document.getElementById("score2").style.display = "none";
+                food = null; // sin comida en modo 1v1
+            } else {
+                snake2 = null;
+                document.getElementById("score").style.display = "block";
+                document.getElementById("score2").style.display = "none";
+                placeFood(); // solo el modo Solitario tiene comida
+            }
+
+            closeGameOver();
+            updateDpadVisibility();
+
+            currentSpeed = INITIAL_SPEED;
+            tickCount = 0;
+
+            if (settings.countdownEnabled) {
+                startCountdown();
+            } else {
+                beginLoop();
+            }
+        }
+
+        function beginLoop() {
+            clearInterval(gameLoop);
+            gameLoop = setInterval(update, currentSpeed);
+        }
+
+        function speedUpIfNeeded() {
+            tickCount++;
+            if (tickCount % SPEED_UP_EVERY_TICKS === 0 && currentSpeed > MIN_SPEED) {
+                currentSpeed = Math.max(MIN_SPEED, currentSpeed - SPEED_STEP);
+                beginLoop();
+            }
+        }
+
+        /* ---------------- Cuenta regresiva ---------------- */
+        let countdownInterval = null;
+
+        function startCountdown() {
+            const overlay = document.getElementById("countdownOverlay");
+            const text = document.getElementById("countdownText");
+            let n = 3;
+
+            overlay.style.display = "flex";
+            text.classList.remove("countdown-go");
+            text.textContent = n;
+
+            clearInterval(countdownInterval);
+            countdownInterval = setInterval(() => {
+                n--;
+                if (n > 0) {
+                    text.classList.remove("countdown-go");
+                    text.textContent = n;
+                } else if (n === 0) {
+                    text.classList.add("countdown-go");
+                    text.textContent = "¡Adelante!";
+                } else {
+                    clearInterval(countdownInterval);
+                    overlay.style.display = "none";
+                    beginLoop();
+                }
+            }, 1000);
+        }
+
+        function placeFood() {
+            food = {
+                x: Math.floor(Math.random() * (canvas.width / gridSize)),
+                y: Math.floor(Math.random() * (canvas.height / gridSize))
+            };
+        }
+
+        function checkCollision(head, ownSnake, otherSnake) {
+            if (
+                head.x < 0 || head.y < 0 ||
+                head.x >= canvas.width / gridSize ||
+                head.y >= canvas.height / gridSize
+            ) return true;
+
+            if (ownSnake.some(s => s.x === head.x && s.y === head.y)) return true;
+            if (otherSnake && otherSnake.some(s => s.x === head.x && s.y === head.y)) return true;
+
+            return false;
+        }
+
+        function endGame(message) {
+            clearInterval(gameLoop);
+
+            if (mode === "solo" && score > highScore) {
+                highScore = score;
+                localStorage.setItem("snakeHighScore", highScore);
+                document.getElementById("highscore").textContent = "Récord: " + highScore;
+            }
+
+            showGameOver(message);
+        }
+
+        function showGameOver(message) {
+            document.getElementById("gameOverText").innerHTML = message;
+            document.getElementById("gameOverOverlay").style.display = "flex";
+        }
+
+        function closeGameOver() {
+            document.getElementById("gameOverOverlay").style.display = "none";
+        }
+
+        function update() {
+            const head = {
+                x: snake[0].x + direction.x,
+                y: snake[0].y + direction.y
+            };
+
+            let head2 = null;
+            if (mode === "1v1") {
+                head2 = {
+                    x: snake2[0].x + direction2.x,
+                    y: snake2[0].y + direction2.y
+                };
+            }
+
+            const p1Dead = checkCollision(head, snake, mode === "1v1" ? snake2 : null);
+            const p2Dead = (mode === "1v1") ? checkCollision(head2, snake2, snake) : false;
+
+            if (p1Dead || p2Dead) {
+                let msg;
+                if (mode === "1v1") {
+                    if (p1Dead && p2Dead) {
+                        msg = `Empate. ¡Ambas serpientes chocaron a la vez!`;
+                    } else if (p1Dead) {
+                        msg = `<span class="winner-line">¡Gana el Jugador 2! 🔵</span><br>El Jugador 1 🟢 chocó primero.`;
+                    } else {
+                        msg = `<span class="winner-line">¡Gana el Jugador 1! 🟢</span><br>El Jugador 2 🔵 chocó primero.`;
+                    }
+                } else {
+                    msg = `Puntaje: ${score}`;
+                }
+                endGame(msg);
+                return;
+            }
+
+            snake.unshift(head);
+            if (mode === "solo") {
+                if (head.x === food.x && head.y === food.y) {
+                    score++;
+                    document.getElementById("score").textContent = "Puntos: " + score;
+                    placeFood();
+                } else {
+                    snake.pop();
+                }
+            } else {
+                // Modo 1v1: PvP puro, sin comida ni crecimiento, solo se pierde al chocar
+                snake.pop();
+            }
+
+            if (mode === "1v1") {
+                snake2.unshift(head2);
+                snake2.pop();
+            }
+
+            speedUpIfNeeded();
+            draw();
+        }
+
+        function draw() {
+            ctx.fillStyle = "#222";
+            ctx.fillRect(0, 0, canvas.width, canvas.height);
+
+            // Serpiente jugador 1: cuerpo verde, cabeza verde oscuro
+            snake.forEach((part, i) => {
+                ctx.fillStyle = (i === 0) ? "#1b4d1b" : "lime";
+                ctx.fillRect(part.x * gridSize, part.y * gridSize, gridSize - 2, gridSize - 2);
+            });
+
+            // Serpiente jugador 2: cuerpo celeste, cabeza azul
+            if (mode === "1v1" && snake2) {
+                snake2.forEach((part, i) => {
+                    ctx.fillStyle = (i === 0) ? "#0d47a1" : "#4fc3f7";
+                    ctx.fillRect(part.x * gridSize, part.y * gridSize, gridSize - 2, gridSize - 2);
+                });
+            }
+
+            // La comida solo existe en el modo Solitario; en 1v1 es puro PvP
+            if (mode === "solo" && food) {
+                ctx.fillStyle = "red";
+                ctx.fillRect(food.x * gridSize, food.y * gridSize, gridSize - 2, gridSize - 2);
+            }
+        }
+
+        /* ---------------- Controles de teclado ---------------- */
+        document.addEventListener("keydown", e => {
+            // ENTER inicia (o reinicia) el juego, sin necesidad de tocar el botón "Empezar"
+            if (e.key === "Enter") {
+                startGame();
+                return;
+            }
+
+            // Jugador 1 (o único jugador si es solo): flechas si es PC en modo solo,
+            // WASD si es 1v1
+            if (mode === "solo") {
+                if (e.key === "ArrowUp" && direction.y === 0) direction = { x: 0, y: -1 };
+                else if (e.key === "ArrowDown" && direction.y === 0) direction = { x: 0, y: 1 };
+                else if (e.key === "ArrowLeft" && direction.x === 0) direction = { x: -1, y: 0 };
+                else if (e.key === "ArrowRight" && direction.x === 0) direction = { x: 1, y: 0 };
+            } else if (mode === "1v1") {
+                // Jugador 1: WASD
+                const key = e.key.toLowerCase();
+                if (key === "w" && direction.y === 0) direction = { x: 0, y: -1 };
+                else if (key === "s" && direction.y === 0) direction = { x: 0, y: 1 };
+                else if (key === "a" && direction.x === 0) direction = { x: -1, y: 0 };
+                else if (key === "d" && direction.x === 0) direction = { x: 1, y: 0 };
+
+                // Jugador 2: flechas
+                if (snake2) {
+                    if (e.key === "ArrowUp" && direction2.y === 0) direction2 = { x: 0, y: -1 };
+                    else if (e.key === "ArrowDown" && direction2.y === 0) direction2 = { x: 0, y: 1 };
+                    else if (e.key === "ArrowLeft" && direction2.x === 0) direction2 = { x: -1, y: 0 };
+                    else if (e.key === "ArrowRight" && direction2.x === 0) direction2 = { x: 1, y: 0 };
+                }
+            }
+        });
+
+        /* ---------------- Controles digitales (dpad) ---------------- */
+        function setDirButton(player, dir) {
+            let dirObj;
+            if (dir === "up") dirObj = { x: 0, y: -1 };
+            else if (dir === "down") dirObj = { x: 0, y: 1 };
+            else if (dir === "left") dirObj = { x: -1, y: 0 };
+            else if (dir === "right") dirObj = { x: 1, y: 0 };
+
+            if (player === 1) {
+                if (direction.x === 0 && dirObj.x !== 0) direction = dirObj;
+                if (direction.y === 0 && dirObj.y !== 0) direction = dirObj;
+            } else if (player === 2 && snake2) {
+                if (direction2.x === 0 && dirObj.x !== 0) direction2 = dirObj;
+                if (direction2.y === 0 && dirObj.y !== 0) direction2 = dirObj;
+            }
+        }
+
+        // Estado inicial de dpads según dispositivo
+        updateDpadVisibility();
+    </script>
+
+</body>
+
+</html>
