@@ -16,14 +16,33 @@
             text-align: center;
             font-family: Arial, sans-serif;
             padding-bottom: 40px;
+            margin: 0;
+            overflow-x: hidden;
         }
 
         canvas {
             background: #222;
-            border: 2px solid #555;
-            margin-top: 10px;
-            max-width: 90vw;
-            height: auto;
+            border-top: 2px solid #555;
+            border-bottom: 2px solid #555;
+            border-left: none;
+            border-right: none;
+            display: block;
+            margin: 10px auto 0 auto;
+        }
+
+        #pauseIndicator {
+            display: none;
+            position: fixed;
+            top: 10px;
+            right: 15px;
+            background: rgba(0, 0, 0, 0.6);
+            border: 1px solid #ffb300;
+            color: #ffb300;
+            padding: 6px 12px;
+            border-radius: 6px;
+            font-weight: bold;
+            font-size: 14px;
+            z-index: 600;
         }
 
         #score,
@@ -296,6 +315,15 @@
             transform: translateX(22px);
         }
 
+        .setting-row select {
+            background: #222;
+            color: white;
+            border: 1px solid #555;
+            border-radius: 6px;
+            padding: 6px 10px;
+            font-size: 14px;
+        }
+
         /* ---------- Controles digitales (móvil / tablet / PlayStation) ---------- */
         .dpad {
             position: fixed;
@@ -363,6 +391,25 @@
             grid-column: 2;
             grid-row: 3;
         }
+
+        .dpad-shoot {
+            grid-column: 2;
+            grid-row: 2;
+            display: none;
+            align-items: center;
+            justify-content: center;
+            font-size: 18px !important;
+            background: rgba(255, 82, 82, 0.25) !important;
+            border: 1px solid #ff5252 !important;
+        }
+
+        .dpad-shoot:active {
+            background: rgba(255, 82, 82, 0.6) !important;
+        }
+
+        .dpad.pvp .dpad-shoot {
+            display: flex;
+        }
     </style>
 </head>
 
@@ -401,7 +448,30 @@
                 <span class="slider"></span>
             </label>
         </div>
+        <div class="setting-row">
+            <span>Emblema</span>
+            <select id="emblemSelect" onchange="changeEmblem(this.value)">
+                <option value="gamingfever">Gaming Fever (predeterminado)</option>
+                <option value="rojo">Rojo</option>
+                <option value="rosa">Rosa</option>
+                <option value="amarillo">Amarillo</option>
+                <option value="negro">Negro</option>
+                <option value="marron">Marrón</option>
+                <option value="blanco">Blanco</option>
+                <option value="naranja">Naranja</option>
+                <option value="morado">Morado</option>
+                <option value="azul">Azul</option>
+                <option value="celeste">Celeste</option>
+                <option value="turquesa">Turquesa</option>
+                <option value="verde">Verde</option>
+                <option value="verdelima">Verde lima</option>
+                <option value="bordo">Bordo</option>
+            </select>
+        </div>
     </div>
+
+    <!-- Indicador de pausa -->
+    <div id="pauseIndicator">⏸ Juego en Pausa</div>
 
     <!-- Cartel de Game Over -->
     <div id="gameOverOverlay">
@@ -419,18 +489,20 @@
 
     <!-- Controles digitales Jugador 1 (abajo izquierda) -->
     <div class="dpad" id="dpadP1">
-        <button class="dpad-up" onclick="setDirButton(1,'up')">▲</button>
-        <button class="dpad-left" onclick="setDirButton(1,'left')">◀</button>
-        <button class="dpad-right" onclick="setDirButton(1,'right')">▶</button>
-        <button class="dpad-down" onclick="setDirButton(1,'down')">▼</button>
+        <button class="dpad-up" onpointerdown="dpadDown(1,'up')" onpointerup="dpadUp(1,'up')">▲</button>
+        <button class="dpad-left" onpointerdown="dpadDown(1,'left')" onpointerup="dpadUp(1,'left')">◀</button>
+        <button class="dpad-shoot" onclick="dpadShoot(1)">🔫</button>
+        <button class="dpad-right" onpointerdown="dpadDown(1,'right')" onpointerup="dpadUp(1,'right')">▶</button>
+        <button class="dpad-down" onpointerdown="dpadDown(1,'down')" onpointerup="dpadUp(1,'down')">▼</button>
     </div>
 
     <!-- Controles digitales Jugador 2 (abajo derecha) -->
     <div class="dpad" id="dpadP2">
-        <button class="dpad-up" onclick="setDirButton(2,'up')">▲</button>
-        <button class="dpad-left" onclick="setDirButton(2,'left')">◀</button>
-        <button class="dpad-right" onclick="setDirButton(2,'right')">▶</button>
-        <button class="dpad-down" onclick="setDirButton(2,'down')">▼</button>
+        <button class="dpad-up" onpointerdown="dpadDown(2,'up')" onpointerup="dpadUp(2,'up')">▲</button>
+        <button class="dpad-left" onpointerdown="dpadDown(2,'left')" onpointerup="dpadUp(2,'left')">◀</button>
+        <button class="dpad-shoot" onclick="dpadShoot(2)">🔫</button>
+        <button class="dpad-right" onpointerdown="dpadDown(2,'right')" onpointerup="dpadUp(2,'right')">▶</button>
+        <button class="dpad-down" onpointerdown="dpadDown(2,'down')" onpointerup="dpadUp(2,'down')">▼</button>
     </div>
 
     <script>
@@ -438,9 +510,46 @@
         const ctx = canvas.getContext("2d");
 
         const gridSize = 20;
-        let snake, direction, food, score, gameLoop;
-        let snake2, direction2, score2;
+        let snake, direction, nextDirection, food, score, gameLoop;
+        let snake2, direction2, nextDirection2, score2;
         let mode = "solo"; // "solo" | "1v1"
+        let isPlaying = false;
+        let isPaused = false;
+
+        // Comida: ahora puede haber varias a la vez (hasta 4), en ambos modos
+        const MAX_FOOD = 4;
+        let foods = [];
+
+        // Disparos (solo modo 1v1)
+        let bullets = [];
+        let bulletLoop = null;
+        const BULLET_SPEED_MS = 70;
+        let heldKeys1 = { w: false, a: false, s: false, d: false };
+        let heldKeys2 = { up: false, down: false, left: false, right: false };
+
+        // Emblemas (colores de la serpiente)
+        const LOGO_TEXT = "#GAMING FEVER";
+        const LOGO_BODY_COLOR = "#d32f2f";
+        const LOGO_HEAD_COLOR = "#7f0000";
+        const LOGO_LETTER_COLOR = "#ffffff";
+
+        const EMBLEMS = {
+            gamingfever: { body: LOGO_BODY_COLOR, head: LOGO_HEAD_COLOR },
+            rojo: { body: "#e53935", head: "#7f0000" },
+            rosa: { body: "#f06292", head: "#ad1457" },
+            amarillo: { body: "#fdd835", head: "#b28900" },
+            negro: { body: "#444444", head: "#111111" },
+            marron: { body: "#795548", head: "#4e342e" },
+            blanco: { body: "#f5f5f5", head: "#bdbdbd" },
+            naranja: { body: "#fb8c00", head: "#b35900" },
+            morado: { body: "#8e24aa", head: "#4a148c" },
+            azul: { body: "#1e88e5", head: "#0d47a1" },
+            celeste: { body: "#4fc3f7", head: "#0288d1" },
+            turquesa: { body: "#26a69a", head: "#00695c" },
+            verde: { body: "#43a047", head: "#1b5e20" },
+            verdelima: { body: "#cddc39", head: "#9e9d24" },
+            bordo: { body: "#7b1e34", head: "#4a0f1f" }
+        };
 
         // Velocidad: arranca más lenta y va subiendo de a poco
         const INITIAL_SPEED = 160; // ms entre movimientos (más alto = más lento)
@@ -450,19 +559,37 @@
         let currentSpeed = INITIAL_SPEED;
         let tickCount = 0;
 
+        /* ---------------- Tamaño del mapa: a todo el ancho de la pantalla ---------------- */
+        function fitCanvasToScreen() {
+            const availableWidth = document.documentElement.clientWidth;
+            const cols = Math.max(10, Math.floor(availableWidth / gridSize));
+            canvas.width = cols * gridSize;
+        }
+        fitCanvasToScreen();
+        window.addEventListener("resize", () => {
+            if (!isPlaying) fitCanvasToScreen();
+        });
+
         // cargar récord
         let highScore = localStorage.getItem("snakeHighScore") || 0;
         document.getElementById("highscore").textContent = "Récord: " + highScore;
 
         // ---------------- Ajustes ----------------
         let settings = {
-            countdownEnabled: localStorage.getItem("snakeCountdownEnabled") !== "false"
+            countdownEnabled: localStorage.getItem("snakeCountdownEnabled") === "true", // desactivada por defecto
+            emblem: localStorage.getItem("snakeEmblem") || "gamingfever"
         };
         document.getElementById("toggleCountdown").checked = settings.countdownEnabled;
+        document.getElementById("emblemSelect").value = settings.emblem;
 
         function toggleCountdownSetting(checked) {
             settings.countdownEnabled = checked;
             localStorage.setItem("snakeCountdownEnabled", checked);
+        }
+
+        function changeEmblem(value) {
+            settings.emblem = value;
+            localStorage.setItem("snakeEmblem", value);
         }
 
         /* ---------------- Detección de dispositivo ---------------- */
@@ -481,6 +608,11 @@
 
         /* ---------------- Pestañas ---------------- */
         function selectTab(tab) {
+            // Si había una partida en curso, se corta al cambiar de pestaña
+            if (isPlaying) {
+                stopGame();
+            }
+
             document.getElementById("tabSolo").classList.remove("active");
             document.getElementById("tab1v1").classList.remove("active");
             document.getElementById("tabHelp").classList.remove("active");
@@ -522,13 +654,17 @@
                     <p><strong>Juego Solitario:</strong> usá las flechitas digitales que aparecen en la esquina inferior izquierda de la pantalla para mover la serpiente.</p>
                     <p><strong>Modo 1v1:</strong></p>
                     <p>🟢 Jugador 1: flechitas digitales en la esquina <strong>inferior izquierda</strong>.</p>
-                    <p>🔵 Jugador 2: flechitas digitales en la esquina <strong>inferior derecha</strong>.</p>`;
+                    <p>🔵 Jugador 2: flechitas digitales en la esquina <strong>inferior derecha</strong>.</p>
+                    <p>🔫 Para disparar, tocá el botón con el arma en el centro de tus flechitas. Mantené presionadas dos flechitas a la vez para apuntar en diagonal.</p>
+                    <p>🍎 Puede haber hasta 4 comidas en el mapa a la vez, en ambos modos.</p>`;
             } else {
                 html += `
-                    <p><strong>Juego Solitario:</strong> movete con las flechas del teclado (↑ ↓ ← →).</p>
+                    <p><strong>Juego Solitario:</strong> movete con las flechas del teclado (↑ ↓ ← →). Apretá <strong>Espacio</strong> para pausar y despausar la partida.</p>
                     <p><strong>Modo 1v1:</strong></p>
-                    <p>🟢 Jugador 1: teclas <strong>W A S D</strong>.</p>
-                    <p>🔵 Jugador 2: flechas del teclado <strong>↑ ↓ ← →</strong>.</p>`;
+                    <p>🟢 Jugador 1: teclas <strong>W A S D</strong>. Disparás con la tecla <strong>R</strong>. Mantené dos teclas juntas (por ej. W+D) para disparar en diagonal.</p>
+                    <p>🔵 Jugador 2: flechas del teclado <strong>↑ ↓ ← →</strong>. Disparás con <strong>Shift derecho</strong>. Mantené dos flechas juntas para disparar en diagonal.</p>
+                    <p>🍎 Puede haber hasta 4 comidas en el mapa a la vez, en ambos modos.</p>
+                    <p>⚔️ En el 1v1 no gana quien come más: gana el que no choca, o el que elimina al otro a los disparos (si le quedan 2 cuadraditos o menos, muere).</p>`;
             }
 
             panel.innerHTML = html;
@@ -540,6 +676,8 @@
 
             dpadP1.classList.remove("show");
             dpadP2.classList.remove("show");
+            dpadP1.classList.toggle("pvp", mode === "1v1");
+            dpadP2.classList.toggle("pvp", mode === "1v1");
 
             if (!usesTouchControls) return;
 
@@ -554,29 +692,42 @@
         /* ---------------- Juego ---------------- */
         function startGame() {
             clearInterval(gameLoop);
+            clearInterval(bulletLoop);
             clearInterval(countdownInterval);
+
+            if (!isPlaying) fitCanvasToScreen();
 
             snake = [{ x: 10, y: 10 }];
             direction = { x: 1, y: 0 };
+            nextDirection = { x: 1, y: 0 };
             score = 0;
             document.getElementById("score").textContent = "Puntos: 0";
+
+            heldKeys1 = { w: false, a: false, s: false, d: false };
+            heldKeys2 = { up: false, down: false, left: false, right: false };
+            bullets = [];
 
             if (mode === "1v1") {
                 snake2 = [{ x: 5, y: 5 }];
                 direction2 = { x: -1, y: 0 };
+                nextDirection2 = { x: -1, y: 0 };
                 score2 = 0;
-                // En 1v1 no hay puntaje por comida: es PvP, gana el que no choca
+                // En 1v1 no se muestran puntos: es PvP, gana el que no choca o el que elimina al rival
                 document.getElementById("score").style.display = "none";
                 document.getElementById("score2").style.display = "none";
-                food = null; // sin comida en modo 1v1
             } else {
                 snake2 = null;
                 document.getElementById("score").style.display = "block";
                 document.getElementById("score2").style.display = "none";
-                placeFood(); // solo el modo Solitario tiene comida
             }
 
+            // Comida: entre 1 y 4 a la vez, al azar, en ambos modos
+            spawnFoods(Math.floor(Math.random() * MAX_FOOD) + 1);
+
             closeGameOver();
+            hidePauseIndicator();
+            isPaused = false;
+            isPlaying = true;
             updateDpadVisibility();
 
             currentSpeed = INITIAL_SPEED;
@@ -589,16 +740,49 @@
             }
         }
 
+        function stopGame() {
+            clearInterval(gameLoop);
+            clearInterval(bulletLoop);
+            clearInterval(countdownInterval);
+            document.getElementById("countdownOverlay").style.display = "none";
+            hidePauseIndicator();
+            isPlaying = false;
+            isPaused = false;
+        }
+
         function beginLoop() {
             clearInterval(gameLoop);
             gameLoop = setInterval(update, currentSpeed);
+            if (mode === "1v1") {
+                startBulletLoop();
+            }
+        }
+
+        function togglePause() {
+            isPaused = !isPaused;
+            if (isPaused) {
+                clearInterval(gameLoop);
+                showPauseIndicator();
+            } else {
+                gameLoop = setInterval(update, currentSpeed);
+                hidePauseIndicator();
+            }
+        }
+
+        function showPauseIndicator() {
+            document.getElementById("pauseIndicator").style.display = "block";
+        }
+
+        function hidePauseIndicator() {
+            document.getElementById("pauseIndicator").style.display = "none";
         }
 
         function speedUpIfNeeded() {
             tickCount++;
             if (tickCount % SPEED_UP_EVERY_TICKS === 0 && currentSpeed > MIN_SPEED) {
                 currentSpeed = Math.max(MIN_SPEED, currentSpeed - SPEED_STEP);
-                beginLoop();
+                clearInterval(gameLoop);
+                gameLoop = setInterval(update, currentSpeed);
             }
         }
 
@@ -631,11 +815,35 @@
             }, 1000);
         }
 
-        function placeFood() {
-            food = {
-                x: Math.floor(Math.random() * (canvas.width / gridSize)),
-                y: Math.floor(Math.random() * (canvas.height / gridSize))
-            };
+        function randomEmptyCell() {
+            const cols = canvas.width / gridSize, rows = canvas.height / gridSize;
+            let x, y, tries = 0;
+            do {
+                x = Math.floor(Math.random() * cols);
+                y = Math.floor(Math.random() * rows);
+                tries++;
+            } while (
+                tries < 300 &&
+                (
+                    (snake && snake.some(s => s.x === x && s.y === y)) ||
+                    (snake2 && snake2.some(s => s.x === x && s.y === y)) ||
+                    foods.some(f => f.x === x && f.y === y)
+                )
+            );
+            return { x, y };
+        }
+
+        function spawnFoods(count) {
+            foods = [];
+            for (let i = 0; i < count; i++) {
+                foods.push(randomEmptyCell());
+            }
+        }
+
+        function respawnOneFood() {
+            if (foods.length < MAX_FOOD) {
+                foods.push(randomEmptyCell());
+            }
         }
 
         function checkCollision(head, ownSnake, otherSnake) {
@@ -653,6 +861,8 @@
 
         function endGame(message) {
             clearInterval(gameLoop);
+            clearInterval(bulletLoop);
+            isPlaying = false;
 
             if (mode === "solo" && score > highScore) {
                 highScore = score;
@@ -673,6 +883,11 @@
         }
 
         function update() {
+            // Aplicamos la dirección en cola una sola vez por tick (evita el choque falso
+            // al apretar varias flechas muy rápido antes de que la serpiente se mueva)
+            direction = nextDirection;
+            if (mode === "1v1") direction2 = nextDirection2;
+
             const head = {
                 x: snake[0].x + direction.x,
                 y: snake[0].y + direction.y
@@ -707,22 +922,26 @@
             }
 
             snake.unshift(head);
-            if (mode === "solo") {
-                if (head.x === food.x && head.y === food.y) {
-                    score++;
-                    document.getElementById("score").textContent = "Puntos: " + score;
-                    placeFood();
-                } else {
-                    snake.pop();
-                }
+            const eatenIndex1 = foods.findIndex(f => f.x === head.x && f.y === head.y);
+            if (eatenIndex1 !== -1) {
+                foods.splice(eatenIndex1, 1);
+                score++;
+                if (mode === "solo") document.getElementById("score").textContent = "Puntos: " + score;
+                respawnOneFood();
             } else {
-                // Modo 1v1: PvP puro, sin comida ni crecimiento, solo se pierde al chocar
                 snake.pop();
             }
 
             if (mode === "1v1") {
                 snake2.unshift(head2);
-                snake2.pop();
+                const eatenIndex2 = foods.findIndex(f => f.x === head2.x && f.y === head2.y);
+                if (eatenIndex2 !== -1) {
+                    foods.splice(eatenIndex2, 1);
+                    score2++;
+                    respawnOneFood();
+                } else {
+                    snake2.pop();
+                }
             }
 
             speedUpIfNeeded();
@@ -733,10 +952,45 @@
             ctx.fillStyle = "#222";
             ctx.fillRect(0, 0, canvas.width, canvas.height);
 
-            // Serpiente jugador 1: cuerpo verde, cabeza verde oscuro
+            // Comidas (hasta 4 a la vez, en ambos modos)
+            ctx.fillStyle = "red";
+            foods.forEach(f => {
+                ctx.fillRect(f.x * gridSize, f.y * gridSize, gridSize - 2, gridSize - 2);
+            });
+
+            // Serpiente jugador 1: emblema elegido (por defecto, letras de #GAMING FEVER en Solitario)
+            const useLogoLetters = (mode === "solo" && settings.emblem === "gamingfever");
+            const emblem = EMBLEMS[settings.emblem] || EMBLEMS.gamingfever;
+
             snake.forEach((part, i) => {
-                ctx.fillStyle = (i === 0) ? "#1b4d1b" : "lime";
-                ctx.fillRect(part.x * gridSize, part.y * gridSize, gridSize - 2, gridSize - 2);
+                const px = part.x * gridSize;
+                const py = part.y * gridSize;
+                let cellColor;
+                let letter = null;
+
+                if (i === 0) {
+                    cellColor = emblem.head;
+                } else {
+                    cellColor = emblem.body;
+                    if (useLogoLetters) {
+                        const idx = i - 1;
+                        if (idx < LOGO_TEXT.length) {
+                            const ch = LOGO_TEXT[idx];
+                            if (ch !== " ") letter = ch;
+                        }
+                    }
+                }
+
+                ctx.fillStyle = cellColor;
+                ctx.fillRect(px, py, gridSize - 2, gridSize - 2);
+
+                if (letter) {
+                    ctx.fillStyle = LOGO_LETTER_COLOR;
+                    ctx.font = `bold ${gridSize - 8}px Arial`;
+                    ctx.textAlign = "center";
+                    ctx.textBaseline = "middle";
+                    ctx.fillText(letter, px + (gridSize - 2) / 2, py + (gridSize - 2) / 2 + 1);
+                }
             });
 
             // Serpiente jugador 2: cuerpo celeste, cabeza azul
@@ -747,61 +1001,203 @@
                 });
             }
 
-            // La comida solo existe en el modo Solitario; en 1v1 es puro PvP
-            if (mode === "solo" && food) {
-                ctx.fillStyle = "red";
-                ctx.fillRect(food.x * gridSize, food.y * gridSize, gridSize - 2, gridSize - 2);
+            // Balas (solo modo 1v1)
+            if (mode === "1v1" && bullets.length) {
+                bullets.forEach(b => {
+                    ctx.fillStyle = (b.owner === 1) ? "#ffeb3b" : "#ffffff";
+                    ctx.beginPath();
+                    ctx.arc(
+                        b.x * gridSize + gridSize / 2,
+                        b.y * gridSize + gridSize / 2,
+                        gridSize / 4,
+                        0, Math.PI * 2
+                    );
+                    ctx.fill();
+                });
+            }
+        }
+
+        /* ---------------- Disparos (modo 1v1) ---------------- */
+        function isOpposite(a, b) {
+            return a.x === -b.x && a.y === -b.y;
+        }
+
+        function trySetDirection(player, newDir) {
+            if (player === 1) {
+                if (!isOpposite(newDir, nextDirection)) nextDirection = newDir;
+            } else {
+                if (!isOpposite(newDir, nextDirection2)) nextDirection2 = newDir;
+            }
+        }
+
+        function getShotVector(held, fallbackDir) {
+            let dx = 0, dy = 0;
+            if (held.up || held.w) dy = -1;
+            else if (held.down || held.s) dy = 1;
+            if (held.left || held.a) dx = -1;
+            else if (held.right || held.d) dx = 1;
+            if (dx === 0 && dy === 0) return { x: fallbackDir.x, y: fallbackDir.y };
+            return { x: dx, y: dy };
+        }
+
+        function shoot(player) {
+            if (mode !== "1v1" || !isPlaying) return;
+            const head = player === 1 ? snake[0] : snake2[0];
+            const vector = player === 1
+                ? getShotVector(heldKeys1, direction)
+                : getShotVector(heldKeys2, direction2);
+
+            bullets.push({
+                x: head.x + vector.x,
+                y: head.y + vector.y,
+                dx: vector.x,
+                dy: vector.y,
+                owner: player
+            });
+        }
+
+        function startBulletLoop() {
+            clearInterval(bulletLoop);
+            bulletLoop = setInterval(() => {
+                if (!bullets.length) return;
+
+                bullets.forEach(b => {
+                    b.x += b.dx;
+                    b.y += b.dy;
+                });
+
+                const cols = canvas.width / gridSize, rows = canvas.height / gridSize;
+                bullets = bullets.filter(b => b.x >= 0 && b.y >= 0 && b.x < cols && b.y < rows);
+
+                bullets = bullets.filter(b => {
+                    const targetSnake = b.owner === 1 ? snake2 : snake;
+                    if (!targetSnake) return false;
+                    const hit = targetSnake.some(s => s.x === b.x && s.y === b.y);
+                    if (hit) {
+                        applyHit(b.owner === 1 ? 2 : 1);
+                        return false;
+                    }
+                    return true;
+                });
+
+                draw();
+            }, BULLET_SPEED_MS);
+        }
+
+        function applyHit(targetPlayer) {
+            if (!isPlaying) return;
+            const targetSnake = targetPlayer === 1 ? snake : snake2;
+
+            if (targetSnake.length <= 2) {
+                const msg = targetPlayer === 1
+                    ? `<span class="winner-line">¡Gana el Jugador 2! 🔵</span><br>El Jugador 1 🟢 fue eliminado de un disparo.`
+                    : `<span class="winner-line">¡Gana el Jugador 1! 🟢</span><br>El Jugador 2 🔵 fue eliminado de un disparo.`;
+                endGame(msg);
+            } else {
+                targetSnake.pop();
+                targetSnake.pop();
             }
         }
 
         /* ---------------- Controles de teclado ---------------- */
+        const MOVEMENT_KEYS = ["ArrowUp", "ArrowDown", "ArrowLeft", "ArrowRight", "w", "a", "s", "d", "W", "A", "S", "D", " "];
+
         document.addEventListener("keydown", e => {
-            // ENTER inicia (o reinicia) el juego, sin necesidad de tocar el botón "Empezar"
+            // Bloquea el scroll de la página con flechas/WASD/Espacio mientras se juega,
+            // así el mapa no se corre de lugar al moverte
+            if (isPlaying && MOVEMENT_KEYS.includes(e.key)) {
+                e.preventDefault();
+            }
+
+            // ENTER: si hay un cartel de Game Over abierto, lo cierra (no reinicia la partida).
+            // Si no se está jugando, arranca una partida nueva.
             if (e.key === "Enter") {
-                startGame();
+                if (document.getElementById("gameOverOverlay").style.display === "flex") {
+                    closeGameOver();
+                } else if (!isPlaying) {
+                    startGame();
+                }
                 return;
             }
 
-            // Jugador 1 (o único jugador si es solo): flechas si es PC en modo solo,
-            // WASD si es 1v1
-            if (mode === "solo") {
-                if (e.key === "ArrowUp" && direction.y === 0) direction = { x: 0, y: -1 };
-                else if (e.key === "ArrowDown" && direction.y === 0) direction = { x: 0, y: 1 };
-                else if (e.key === "ArrowLeft" && direction.x === 0) direction = { x: -1, y: 0 };
-                else if (e.key === "ArrowRight" && direction.x === 0) direction = { x: 1, y: 0 };
-            } else if (mode === "1v1") {
-                // Jugador 1: WASD
-                const key = e.key.toLowerCase();
-                if (key === "w" && direction.y === 0) direction = { x: 0, y: -1 };
-                else if (key === "s" && direction.y === 0) direction = { x: 0, y: 1 };
-                else if (key === "a" && direction.x === 0) direction = { x: -1, y: 0 };
-                else if (key === "d" && direction.x === 0) direction = { x: 1, y: 0 };
+            // ESPACIO: pausa/despausa, solo en Juego Solitario
+            if (e.key === " " || e.code === "Space") {
+                if (mode === "solo" && isPlaying) {
+                    togglePause();
+                }
+                return;
+            }
 
-                // Jugador 2: flechas
+            if (!isPlaying || isPaused) return;
+
+            if (mode === "solo") {
+                if (e.key === "ArrowUp") trySetDirection(1, { x: 0, y: -1 });
+                else if (e.key === "ArrowDown") trySetDirection(1, { x: 0, y: 1 });
+                else if (e.key === "ArrowLeft") trySetDirection(1, { x: -1, y: 0 });
+                else if (e.key === "ArrowRight") trySetDirection(1, { x: 1, y: 0 });
+            } else if (mode === "1v1") {
+                // Jugador 1: WASD + R para disparar
+                const key = e.key.toLowerCase();
+                if (key === "w") { heldKeys1.w = true; trySetDirection(1, { x: 0, y: -1 }); }
+                else if (key === "s") { heldKeys1.s = true; trySetDirection(1, { x: 0, y: 1 }); }
+                else if (key === "a") { heldKeys1.a = true; trySetDirection(1, { x: -1, y: 0 }); }
+                else if (key === "d") { heldKeys1.d = true; trySetDirection(1, { x: 1, y: 0 }); }
+                else if (key === "r" && !e.repeat) { shoot(1); }
+
+                // Jugador 2: flechas + Shift derecho para disparar
                 if (snake2) {
-                    if (e.key === "ArrowUp" && direction2.y === 0) direction2 = { x: 0, y: -1 };
-                    else if (e.key === "ArrowDown" && direction2.y === 0) direction2 = { x: 0, y: 1 };
-                    else if (e.key === "ArrowLeft" && direction2.x === 0) direction2 = { x: -1, y: 0 };
-                    else if (e.key === "ArrowRight" && direction2.x === 0) direction2 = { x: 1, y: 0 };
+                    if (e.key === "ArrowUp") { heldKeys2.up = true; trySetDirection(2, { x: 0, y: -1 }); }
+                    else if (e.key === "ArrowDown") { heldKeys2.down = true; trySetDirection(2, { x: 0, y: 1 }); }
+                    else if (e.key === "ArrowLeft") { heldKeys2.left = true; trySetDirection(2, { x: -1, y: 0 }); }
+                    else if (e.key === "ArrowRight") { heldKeys2.right = true; trySetDirection(2, { x: 1, y: 0 }); }
+                    else if (e.code === "ShiftRight" && !e.repeat) { shoot(2); }
                 }
             }
         });
 
-        /* ---------------- Controles digitales (dpad) ---------------- */
-        function setDirButton(player, dir) {
-            let dirObj;
-            if (dir === "up") dirObj = { x: 0, y: -1 };
-            else if (dir === "down") dirObj = { x: 0, y: 1 };
-            else if (dir === "left") dirObj = { x: -1, y: 0 };
-            else if (dir === "right") dirObj = { x: 1, y: 0 };
+        document.addEventListener("keyup", e => {
+            const key = e.key.toLowerCase();
+            if (key === "w") heldKeys1.w = false;
+            else if (key === "s") heldKeys1.s = false;
+            else if (key === "a") heldKeys1.a = false;
+            else if (key === "d") heldKeys1.d = false;
 
+            if (e.key === "ArrowUp") heldKeys2.up = false;
+            else if (e.key === "ArrowDown") heldKeys2.down = false;
+            else if (e.key === "ArrowLeft") heldKeys2.left = false;
+            else if (e.key === "ArrowRight") heldKeys2.right = false;
+        });
+
+        /* ---------------- Controles digitales (dpad) ---------------- */
+        function dirToVector(dir) {
+            if (dir === "up") return { x: 0, y: -1 };
+            if (dir === "down") return { x: 0, y: 1 };
+            if (dir === "left") return { x: -1, y: 0 };
+            return { x: 1, y: 0 };
+        }
+
+        function updateHeldKey(player, dir, val) {
+            const held = player === 1 ? heldKeys1 : heldKeys2;
             if (player === 1) {
-                if (direction.x === 0 && dirObj.x !== 0) direction = dirObj;
-                if (direction.y === 0 && dirObj.y !== 0) direction = dirObj;
-            } else if (player === 2 && snake2) {
-                if (direction2.x === 0 && dirObj.x !== 0) direction2 = dirObj;
-                if (direction2.y === 0 && dirObj.y !== 0) direction2 = dirObj;
+                const map = { up: "w", down: "s", left: "a", right: "d" };
+                held[map[dir]] = val;
+            } else {
+                held[dir] = val;
             }
+        }
+
+        function dpadDown(player, dir) {
+            if (!isPlaying || isPaused) return;
+            updateHeldKey(player, dir, true);
+            trySetDirection(player, dirToVector(dir));
+        }
+
+        function dpadUp(player, dir) {
+            updateHeldKey(player, dir, false);
+        }
+
+        function dpadShoot(player) {
+            shoot(player);
         }
 
         // Estado inicial de dpads según dispositivo
