@@ -45,6 +45,112 @@
             z-index: 600;
         }
 
+        #pauseMobileBtn {
+            display: none;
+            position: fixed;
+            top: 45px;
+            right: 15px;
+            background: #1b1b1b;
+            border: 1px solid #ffb300;
+            color: #ffb300;
+            padding: 6px 12px;
+            border-radius: 6px;
+            font-weight: bold;
+            font-size: 13px;
+            z-index: 600;
+            cursor: pointer;
+        }
+
+        /* ---------- Header: título, marca y logo ---------- */
+        #headerBar {
+            position: relative;
+            display: flex;
+            justify-content: flex-end;
+            align-items: flex-start;
+            flex-wrap: wrap;
+            gap: 10px;
+            padding: 10px 15px 0 15px;
+            text-align: left;
+        }
+
+        #titleBlock {
+            position: absolute;
+            left: 50%;
+            top: 10px;
+            transform: translateX(-50%);
+            display: flex;
+            justify-content: center;
+            align-items: baseline;
+            flex-wrap: wrap;
+            gap: 8px;
+            text-align: center;
+        }
+
+        #mainTitle {
+            font-family: "Times New Roman", Times, serif;
+            font-weight: bold;
+            font-size: 34px;
+        }
+
+        #subTitle {
+            font-style: italic;
+            font-size: 15px;
+            color: #ccc;
+        }
+
+        #headerRight {
+            display: flex;
+            flex-direction: column;
+            align-items: flex-end;
+            gap: 6px;
+        }
+
+        #pichisoftLink {
+            font-weight: bold;
+            font-size: 13px;
+            color: white;
+            text-decoration: none;
+        }
+
+        #pichisoftLink:hover {
+            text-decoration: underline;
+        }
+
+        /* ---------- Logo #GAMINGFEVER (reutilizado en header y banner) ---------- */
+        .logo-row {
+            display: flex;
+            flex-wrap: wrap;
+        }
+
+        .logo-char {
+            background: #d32f2f;
+            color: #ffffff;
+            font-family: Arial, sans-serif;
+            font-size: 26px;
+            padding: 8px 0;
+            line-height: 1.3;
+        }
+
+        .logo-char.bold {
+            font-weight: bold;
+        }
+
+        .logo-row .logo-char:first-child {
+            padding-left: 10px;
+        }
+
+        .logo-row .logo-char:last-child {
+            padding-right: 10px;
+        }
+
+        #soloLogoBanner {
+            display: flex;
+            justify-content: center;
+            flex-wrap: wrap;
+            margin-top: 12px;
+            min-height: 26px;
+        }
+
         #score,
         #highscore {
             margin-top: 8px;
@@ -415,7 +521,19 @@
 
 <body>
 
-    <h1>🐍 Snake</h1>
+    <div id="headerBar">
+        <div id="titleBlock">
+            <span id="mainTitle">PichonSnake</span>
+            <span id="subTitle">-By Pichisoft and GamingFever-</span>
+        </div>
+        <div id="headerRight">
+            <div id="gamingFeverLogo" class="logo-row"></div>
+            <a id="pichisoftLink" href="https://pichisoft.github.io/Web/" target="_blank" rel="noopener">Vea más sobre
+                Pichisoft en: https://pichisoft.github.io/Web/</a>
+        </div>
+    </div>
+
+    <button id="pauseMobileBtn" onclick="togglePause()">Pausar</button>
 
     <div id="scoreboard">
         <div id="score">Puntos: 0</div>
@@ -425,6 +543,10 @@
 
     <button id="startBtn" onclick="startGame()">Empezar</button>
     <br>
+
+    <!-- Texto #GAMINGFEVER que se va completando a medida que comés (solo Juego Solitario) -->
+    <div id="soloLogoBanner" class="logo-row"></div>
+
     <canvas id="game" width="400" height="400"></canvas>
 
     <!-- Pestañas -->
@@ -465,6 +587,7 @@
                 <option value="turquesa">Turquesa</option>
                 <option value="verde">Verde</option>
                 <option value="verdelima">Verde lima</option>
+                <option value="amarillolimon">Amarillo Limón</option>
                 <option value="bordo">Bordo</option>
             </select>
         </div>
@@ -528,7 +651,8 @@
         let heldKeys2 = { up: false, down: false, left: false, right: false };
 
         // Emblemas (colores de la serpiente)
-        const LOGO_TEXT = "#GAMING FEVER";
+        const LOGO_TEXT = "#GAMINGFEVER"; // sin espacio: #GAMING + FEVER, todo junto
+        const LOGO_BOLD_LENGTH = 7; // "#GAMING" (7 caracteres) va en negrita, "FEVER" no
         const LOGO_BODY_COLOR = "#d32f2f";
         const LOGO_HEAD_COLOR = "#7f0000";
         const LOGO_LETTER_COLOR = "#ffffff";
@@ -547,9 +671,26 @@
             celeste: { body: "#4fc3f7", head: "#0288d1" },
             turquesa: { body: "#26a69a", head: "#00695c" },
             verde: { body: "#43a047", head: "#1b5e20" },
-            verdelima: { body: "#cddc39", head: "#9e9d24" },
+            verdelima: { body: "#8bc34a", head: "#558b2f" }, // verde lima real, tipo Minecraft
+            amarillolimon: { body: "#cddc39", head: "#9e9d24" }, // el que antes se llamaba "Verde lima"
             bordo: { body: "#7b1e34", head: "#4a0f1f" }
         };
+
+        // Genera los cuadraditos del logo #GAMINGFEVER (usado en el header y en el banner de Solitario)
+        function buildLogoHTML(revealLength) {
+            const len = (revealLength === undefined || revealLength === null) ? LOGO_TEXT.length : revealLength;
+            // Antes armaba una cajita por cada letra (por eso se veía monoespaciado).
+            // Ahora usamos como máximo 2 bloques de texto corrido: "#GAMING" en negrita
+            // y "FEVER" en fuente normal, con el mismo relleno rojo continuo,
+            // igual que el texto se ve en el emblema de la serpiente.
+            const boldPart = LOGO_TEXT.slice(0, Math.min(len, LOGO_BOLD_LENGTH));
+            const normalPart = LOGO_TEXT.slice(LOGO_BOLD_LENGTH, len);
+
+            let html = "";
+            if (boldPart) html += `<span class="logo-char bold">${boldPart}</span>`;
+            if (normalPart) html += `<span class="logo-char">${normalPart}</span>`;
+            return html;
+        }
 
         // Velocidad: arranca más lenta y va subiendo de a poco
         const INITIAL_SPEED = 160; // ms entre movimientos (más alto = más lento)
@@ -579,6 +720,12 @@
             countdownEnabled: localStorage.getItem("snakeCountdownEnabled") === "true", // desactivada por defecto
             emblem: localStorage.getItem("snakeEmblem") || "gamingfever"
         };
+        // Si el emblema guardado ya no existe (o está corrupto), usamos el predeterminado
+        // en vez de dejar que se vea uno "al azar"
+        if (!EMBLEMS[settings.emblem]) {
+            settings.emblem = "gamingfever";
+            localStorage.setItem("snakeEmblem", settings.emblem);
+        }
         document.getElementById("toggleCountdown").checked = settings.countdownEnabled;
         document.getElementById("emblemSelect").value = settings.emblem;
 
@@ -591,6 +738,22 @@
             settings.emblem = value;
             localStorage.setItem("snakeEmblem", value);
         }
+
+        // Logo #GAMINGFEVER fijo en el header (siempre completo)
+        document.getElementById("gamingFeverLogo").innerHTML = buildLogoHTML();
+
+        // Banner de #GAMINGFEVER que se completa a medida que comés (solo Juego Solitario)
+        function updateSoloBanner() {
+            const el = document.getElementById("soloLogoBanner");
+            if (mode !== "solo") {
+                el.style.display = "none";
+                return;
+            }
+            el.style.display = "flex";
+            const revealLength = Math.min(score || 0, LOGO_TEXT.length);
+            el.innerHTML = buildLogoHTML(revealLength);
+        }
+        updateSoloBanner();
 
         /* ---------------- Detección de dispositivo ---------------- */
         function detectDevice() {
@@ -608,8 +771,10 @@
 
         /* ---------------- Pestañas ---------------- */
         function selectTab(tab) {
-            // Si había una partida en curso, se corta al cambiar de pestaña
-            if (isPlaying) {
+            // Solo cortamos la partida si cambiás de modo de juego (Solitario <-> 1v1).
+            // Abrir "Ajustes" o "¿Cómo se juega?" no debe cancelar una partida pausada.
+            const changesMode = (tab === "solo" || tab === "1v1") && tab !== mode;
+            if (isPlaying && changesMode) {
                 stopGame();
             }
 
@@ -637,8 +802,12 @@
             } else if (tab === "ajustes") {
                 document.getElementById("tabAjustes").classList.add("active");
                 document.getElementById("ajustesPanel").style.display = "block";
+                // Resincroniza el selector por las dudas, para que siempre muestre el emblema real
+                document.getElementById("emblemSelect").value = settings.emblem;
             }
             updateDpadVisibility();
+            updateSoloBanner();
+            updatePauseMobileButton();
         }
 
         function renderHowToPlay() {
@@ -729,6 +898,8 @@
             isPaused = false;
             isPlaying = true;
             updateDpadVisibility();
+            updateSoloBanner();
+            updatePauseMobileButton();
 
             currentSpeed = INITIAL_SPEED;
             tickCount = 0;
@@ -748,6 +919,7 @@
             hidePauseIndicator();
             isPlaying = false;
             isPaused = false;
+            updatePauseMobileButton();
         }
 
         function beginLoop() {
@@ -759,6 +931,8 @@
         }
 
         function togglePause() {
+            if (mode !== "solo" || !isPlaying) return;
+
             isPaused = !isPaused;
             if (isPaused) {
                 clearInterval(gameLoop);
@@ -766,7 +940,12 @@
             } else {
                 gameLoop = setInterval(update, currentSpeed);
                 hidePauseIndicator();
+                // Al despausar, volvemos a fijar la vista en el mapa de juego
+                // para que se vea completo (por si te fuiste a mirar Ajustes, etc.)
+                const canvasEl = document.getElementById("game");
+                if (canvasEl) canvasEl.scrollIntoView({ behavior: "smooth", block: "center" });
             }
+            updatePauseMobileButton();
         }
 
         function showPauseIndicator() {
@@ -775,6 +954,14 @@
 
         function hidePauseIndicator() {
             document.getElementById("pauseIndicator").style.display = "none";
+        }
+
+        // Botón de pausa para Móvil / Tablet / PlayStation (solo Juego Solitario)
+        function updatePauseMobileButton() {
+            const btn = document.getElementById("pauseMobileBtn");
+            const shouldShow = usesTouchControls && mode === "solo" && isPlaying;
+            btn.style.display = shouldShow ? "block" : "none";
+            btn.textContent = isPaused ? "Reanudar" : "Pausar";
         }
 
         function speedUpIfNeeded() {
@@ -863,6 +1050,7 @@
             clearInterval(gameLoop);
             clearInterval(bulletLoop);
             isPlaying = false;
+            updatePauseMobileButton();
 
             if (mode === "solo" && score > highScore) {
                 highScore = score;
@@ -926,7 +1114,10 @@
             if (eatenIndex1 !== -1) {
                 foods.splice(eatenIndex1, 1);
                 score++;
-                if (mode === "solo") document.getElementById("score").textContent = "Puntos: " + score;
+                if (mode === "solo") {
+                    document.getElementById("score").textContent = "Puntos: " + score;
+                    updateSoloBanner();
+                }
                 respawnOneFood();
             } else {
                 snake.pop();
@@ -975,8 +1166,7 @@
                     if (useLogoLetters) {
                         const idx = i - 1;
                         if (idx < LOGO_TEXT.length) {
-                            const ch = LOGO_TEXT[idx];
-                            if (ch !== " ") letter = ch;
+                            letter = LOGO_TEXT[idx];
                         }
                     }
                 }
