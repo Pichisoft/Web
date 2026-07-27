@@ -516,6 +516,100 @@
         .dpad.pvp .dpad-shoot {
             display: flex;
         }
+
+        /* ================================================================
+           RESPONSIVE MÓVIL: todo lo de arriba queda igual para PC.
+           Estas reglas solo se aplican en pantallas chicas (celulares/tablets
+           angostas) para que el título, el link y el logo entren prolijos.
+           ================================================================ */
+        @media (max-width: 600px) {
+            #headerBar {
+                position: static;
+                flex-direction: column;
+                align-items: center;
+                justify-content: center;
+                gap: 6px;
+                padding: 8px 10px 0 10px;
+                text-align: center;
+            }
+
+            #titleBlock {
+                position: static;
+                left: auto;
+                top: auto;
+                transform: none;
+                flex-direction: column;
+                gap: 0;
+                order: 1;
+            }
+
+            #mainTitle {
+                font-size: 22px;
+            }
+
+            #subTitle {
+                font-size: 11px;
+            }
+
+            #headerRight {
+                align-items: center;
+                width: 100%;
+                order: 2;
+                gap: 4px;
+            }
+
+            #pichisoftLink {
+                font-size: 10.5px;
+                text-align: center;
+                word-break: break-word;
+                max-width: 90vw;
+            }
+
+            .logo-char {
+                font-size: 15px;
+                padding: 4px 0;
+            }
+
+            .logo-row .logo-char:first-child {
+                padding-left: 5px;
+            }
+
+            .logo-row .logo-char:last-child {
+                padding-right: 5px;
+            }
+
+            #soloLogoBanner {
+                margin-top: 8px;
+            }
+
+            #scoreboard {
+                gap: 16px;
+                font-size: 14px;
+            }
+
+            #score,
+            #highscore {
+                font-size: 15px;
+            }
+
+            .tab {
+                padding: 8px 10px;
+                font-size: 13px;
+            }
+
+            #howToPlay,
+            #ajustesPanel {
+                max-width: 92vw;
+                padding: 12px 14px;
+                font-size: 13px;
+            }
+
+            #pauseIndicator,
+            #pauseMobileBtn {
+                font-size: 12px;
+                padding: 5px 10px;
+            }
+        }
     </style>
 </head>
 
@@ -833,7 +927,7 @@
                     <p>🟢 Jugador 1: teclas <strong>W A S D</strong>. Disparás con la tecla <strong>R</strong>. Mantené dos teclas juntas (por ej. W+D) para disparar en diagonal.</p>
                     <p>🔵 Jugador 2: flechas del teclado <strong>↑ ↓ ← →</strong>. Disparás con <strong>Shift derecho</strong>. Mantené dos flechas juntas para disparar en diagonal.</p>
                     <p>🍎 Puede haber hasta 4 comidas en el mapa a la vez, en ambos modos.</p>
-                    <p>⚔️ En el 1v1 no gana quien come más: gana el que no choca primero, o el que elimina al otro jugador disparandole (si le quedan 2 cuadraditos o menos, es eliminado).</p>`;
+                    <p>⚔️ En el 1v1 no gana quien come más: gana el que no choca, o el que elimina al otro jugador disparandole (si le quedan 2 cuadraditos o menos, pierde).</p>`;
             }
 
             panel.innerHTML = html;
