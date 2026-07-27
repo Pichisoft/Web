@@ -430,6 +430,42 @@
             font-size: 14px;
         }
 
+        /* ---------- Selector de Dificultad ---------- */
+        .difficulty-toggle-btn {
+            background: #222;
+            color: white;
+            border: 1px solid #555;
+            border-radius: 6px;
+            padding: 6px 10px;
+            font-size: 14px;
+            cursor: pointer;
+        }
+
+        #difficultyOptions {
+            display: none;
+            padding-bottom: 6px;
+        }
+
+        .difficulty-option {
+            background: #222;
+            border: 1px solid #333;
+            border-radius: 6px;
+            padding: 8px 10px;
+            margin-top: 6px;
+            font-size: 13px;
+            line-height: 1.4;
+            cursor: pointer;
+        }
+
+        .difficulty-option:hover {
+            border-color: #4caf50;
+        }
+
+        .difficulty-option.selected {
+            border-color: #2e7d32;
+            background: #17301a;
+        }
+
         /* ---------- Controles digitales (móvil / tablet / PlayStation) ---------- */
         .dpad {
             position: fixed;
@@ -597,6 +633,13 @@
                 font-size: 13px;
             }
 
+            /* Separamos las pestañas de las flechitas digitales fijas, para
+               evitar que el dedo toque "Ajustes"/"¿Cómo se juega?" por error
+               en vez de una flechita */
+            #tabs {
+                margin-top: 220px;
+            }
+
             #howToPlay,
             #ajustesPanel {
                 max-width: 92vw;
@@ -658,11 +701,24 @@
     <div id="ajustesPanel">
         <h3>Ajustes</h3>
         <div class="setting-row">
-            <span>Cuenta regresiva</span>
-            <label class="switch">
-                <input type="checkbox" id="toggleCountdown" onchange="toggleCountdownSetting(this.checked)">
-                <span class="slider"></span>
-            </label>
+            <span>Dificultad</span>
+            <button class="difficulty-toggle-btn" id="difficultyToggleBtn"
+                onclick="toggleDifficultyOptions()">Progresivo ▾</button>
+        </div>
+        <div id="difficultyOptions">
+            <div class="difficulty-option" data-value="facil" onclick="selectDifficulty('facil')">
+                <strong>Fácil:</strong> la serpiente se mueve de manera lenta por toda la partida.
+            </div>
+            <div class="difficulty-option" data-value="intermedio" onclick="selectDifficulty('intermedio')">
+                <strong>Intermedio:</strong> la serpiente se mueve con una velocidad regular por toda la partida.
+            </div>
+            <div class="difficulty-option" data-value="dificil" onclick="selectDifficulty('dificil')">
+                <strong>Difícil:</strong> la serpiente se mueve de manera rápida por toda la partida.
+            </div>
+            <div class="difficulty-option" data-value="progresivo" onclick="selectDifficulty('progresivo')">
+                <strong>Progresivo:</strong> la serpiente se va moviendo de lento a rápido desde el principio de la
+                partida.
+            </div>
         </div>
         <div class="setting-row">
             <span>Emblema</span>
@@ -684,6 +740,13 @@
                 <option value="amarillolimon">Amarillo Limón</option>
                 <option value="bordo">Bordo</option>
             </select>
+        </div>
+        <div class="setting-row">
+            <span>Cuenta regresiva</span>
+            <label class="switch">
+                <input type="checkbox" id="toggleCountdown" onchange="toggleCountdownSetting(this.checked)">
+                <span class="slider"></span>
+            </label>
         </div>
     </div>
 
@@ -730,6 +793,7 @@
         let snake, direction, nextDirection, food, score, gameLoop;
         let snake2, direction2, nextDirection2, score2;
         let mode = "solo"; // "solo" | "1v1"
+        let activeTab = "solo"; // "solo" | "1v1" | "help" | "ajustes" (para saber cuándo mostrar el dpad)
         let isPlaying = false;
         let isPaused = false;
 
@@ -794,6 +858,14 @@
         let currentSpeed = INITIAL_SPEED;
         let tickCount = 0;
 
+        // Dificultad (solo afecta a Juego Solitario; en 1v1 siempre es Progresivo, como antes)
+        const DIFFICULTIES = {
+            facil: { label: "Fácil", speed: 210, progressive: false },
+            intermedio: { label: "Intermedio", speed: 130, progressive: false },
+            dificil: { label: "Difícil", speed: 85, progressive: false },
+            progresivo: { label: "Progresivo", speed: INITIAL_SPEED, progressive: true }
+        };
+
         /* ---------------- Tamaño del mapa: a todo el ancho de la pantalla ---------------- */
         function fitCanvasToScreen() {
             const availableWidth = document.documentElement.clientWidth;
@@ -812,13 +884,19 @@
         // ---------------- Ajustes ----------------
         let settings = {
             countdownEnabled: localStorage.getItem("snakeCountdownEnabled") === "true", // desactivada por defecto
-            emblem: localStorage.getItem("snakeEmblem") || "gamingfever"
+            emblem: localStorage.getItem("snakeEmblem") || "gamingfever",
+            difficulty: localStorage.getItem("snakeDifficulty") || "progresivo"
         };
         // Si el emblema guardado ya no existe (o está corrupto), usamos el predeterminado
         // en vez de dejar que se vea uno "al azar"
         if (!EMBLEMS[settings.emblem]) {
             settings.emblem = "gamingfever";
             localStorage.setItem("snakeEmblem", settings.emblem);
+        }
+        // Misma validación para la dificultad guardada
+        if (!DIFFICULTIES[settings.difficulty]) {
+            settings.difficulty = "progresivo";
+            localStorage.setItem("snakeDifficulty", settings.difficulty);
         }
         document.getElementById("toggleCountdown").checked = settings.countdownEnabled;
         document.getElementById("emblemSelect").value = settings.emblem;
@@ -832,6 +910,28 @@
             settings.emblem = value;
             localStorage.setItem("snakeEmblem", value);
         }
+
+        // Dificultad: mostrar/ocultar las 4 opciones con su descripción
+        function toggleDifficultyOptions() {
+            const panel = document.getElementById("difficultyOptions");
+            panel.style.display = (panel.style.display === "block") ? "none" : "block";
+        }
+
+        function selectDifficulty(value) {
+            settings.difficulty = value;
+            localStorage.setItem("snakeDifficulty", value);
+            updateDifficultyUI();
+            document.getElementById("difficultyOptions").style.display = "none";
+        }
+
+        function updateDifficultyUI() {
+            const btn = document.getElementById("difficultyToggleBtn");
+            if (btn) btn.textContent = DIFFICULTIES[settings.difficulty].label + " ▾";
+            document.querySelectorAll(".difficulty-option").forEach(el => {
+                el.classList.toggle("selected", el.dataset.value === settings.difficulty);
+            });
+        }
+        updateDifficultyUI();
 
         // Logo #GAMINGFEVER fijo en el header (siempre completo)
         document.getElementById("gamingFeverLogo").innerHTML = buildLogoHTML();
@@ -865,6 +965,8 @@
 
         /* ---------------- Pestañas ---------------- */
         function selectTab(tab) {
+            activeTab = tab;
+
             // Solo cortamos la partida si cambiás de modo de juego (Solitario <-> 1v1).
             // Abrir "Ajustes" o "¿Cómo se juega?" no debe cancelar una partida pausada.
             const changesMode = (tab === "solo" || tab === "1v1") && tab !== mode;
@@ -944,6 +1046,10 @@
 
             if (!usesTouchControls) return;
 
+            // Las flechitas solo deben verse en Juego Solitario o Modo 1v1;
+            // si estás en "¿Cómo se juega?" o "Ajustes" no estás jugando en ese momento
+            if (activeTab !== "solo" && activeTab !== "1v1") return;
+
             if (mode === "solo") {
                 dpadP1.classList.add("show");
             } else if (mode === "1v1") {
@@ -997,6 +1103,11 @@
 
             currentSpeed = INITIAL_SPEED;
             tickCount = 0;
+
+            // La Dificultad solo aplica a Juego Solitario; en 1v1 siempre es Progresivo (como antes)
+            if (mode === "solo") {
+                currentSpeed = DIFFICULTIES[settings.difficulty].speed;
+            }
 
             if (settings.countdownEnabled) {
                 startCountdown();
@@ -1059,6 +1170,12 @@
         }
 
         function speedUpIfNeeded() {
+            // En 1v1 siempre es progresivo (como antes). En Solitario, solo si la
+            // dificultad elegida es "Progresivo"; el resto de dificultades mantienen
+            // una velocidad constante durante toda la partida.
+            const isProgressive = (mode === "1v1") || (mode === "solo" && DIFFICULTIES[settings.difficulty].progressive);
+            if (!isProgressive) return;
+
             tickCount++;
             if (tickCount % SPEED_UP_EVERY_TICKS === 0 && currentSpeed > MIN_SPEED) {
                 currentSpeed = Math.max(MIN_SPEED, currentSpeed - SPEED_STEP);
