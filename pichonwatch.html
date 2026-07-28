@@ -3,7 +3,7 @@
 
 <head>
     <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
     <title>PichonWatch</title>
     <style>
         * {
@@ -12,12 +12,14 @@
             box-sizing: border-box;
         }
 
+        html,
         body {
             background: #0a0804;
             overflow: hidden;
             width: 100vw;
             height: 100vh;
             font-family: Georgia, serif;
+            touch-action: none;
         }
 
         #ui {
@@ -26,6 +28,7 @@
             left: 26px;
             z-index: 20;
             pointer-events: all;
+            max-width: 80vw;
         }
 
         h1 {
@@ -74,11 +77,50 @@
             display: block;
         }
 
+        #focusHint {
+            margin-top: 6px;
+            font-size: 11px;
+            color: rgba(240, 228, 204, 0.7);
+            letter-spacing: 0.4px;
+            display: none;
+            line-height: 1.6;
+            max-width: 260px;
+        }
+
+        #focusHint.show {
+            display: block;
+        }
+
         canvas {
             display: block;
             position: fixed;
             top: 0;
             left: 0;
+        }
+
+        /* ── Mobile / narrow-viewport interface tweaks (desktop layout above is untouched) ── */
+        @media (max-width: 620px),
+        (orientation: portrait) {
+            #ui {
+                top: 16px;
+                left: 16px;
+            }
+
+            h1 {
+                font-size: 1.5rem;
+            }
+
+            #editBtn {
+                margin-top: 8px;
+                padding: 6px 16px;
+                font-size: 11px;
+            }
+
+            #hint,
+            #focusHint {
+                font-size: 9.5px;
+                margin-top: 5px;
+            }
         }
     </style>
 </head>
@@ -89,6 +131,7 @@
         <h1><strong>PichonWatch</strong></h1>
         <button id="editBtn">Editar</button>
         <div id="hint">Modo edición — arrastrá las agujas<br>clic derecho para salir</div>
+        <div id="focusHint"></div>
     </div>
 
     <script>
@@ -99,13 +142,37 @@
         function resize() { W = canvas.width = window.innerWidth; H = canvas.height = window.innerHeight; }
         resize();
         window.addEventListener('resize', resize);
+        window.addEventListener('orientationchange', () => setTimeout(resize, 200));
 
-        // ─── CLOCK STATE (LocalStorage) ───────────────────────────────────────────────
-        let hHour = parseFloat(localStorage.getItem('pw_h') || '10.16');
-        let hMin = parseFloat(localStorage.getItem('pw_m') || '10.5');
-        let hSec = parseFloat(localStorage.getItem('pw_s') || '0');
+        // ─── CLOCK STATE — now driven by the REAL device time ─────────────────────────
+        // The face reads the system clock every frame. `offsetSec` is an optional
+        // calibration nudge (seconds, within a 12h cycle) that you set by dragging
+        // the hands in "Editar" mode, saved in localStorage, and simply added on
+        // top of the real time — so it keeps walking in sync instead of drifting.
+        const HALF_DAY = 12 * 3600;
+        let offsetSec = parseFloat(localStorage.getItem('pw_offset') || '0');
+        let hHour = 0, hMin = 0, hSec = 0; // recomputed every frame — see applyRealTime()
 
-        function saveTime() { localStorage.setItem('pw_h', hHour); localStorage.setItem('pw_m', hMin); localStorage.setItem('pw_s', hSec); }
+        function realSecondsIn12h() {
+            const d = new Date();
+            return (d.getHours() % 12) * 3600 + d.getMinutes() * 60 + d.getSeconds() + d.getMilliseconds() / 1000;
+        }
+
+        function applyRealTime() {
+            let t = ((realSecondsIn12h() + offsetSec) % HALF_DAY + HALF_DAY) % HALF_DAY;
+            hHour = t / 3600;
+            hMin = (t % 3600) / 60;
+            hSec = t % 60;
+        }
+        applyRealTime(); // show the correct time immediately, before the first frame
+
+        function saveTime() {
+            // Turn whatever the hands are currently pointing at (set by dragging)
+            // into an offset from the real time, so the clock keeps ticking correctly.
+            const edited = (hHour % 12) * 3600 + hMin * 60 + hSec;
+            offsetSec = edited - realSecondsIn12h();
+            localStorage.setItem('pw_offset', offsetSec);
+        }
 
         // ─── CAMERA / ZOOM STATE ──────────────────────────────────────────────────────
         let editMode = false;
@@ -123,8 +190,14 @@
         let drag = null; // 'h' | 'm' | 's'
         let secRunning = true; // seconds tick when not editing
 
+        // ─── INTERACTIVE OBJECTS REGISTRY (paintings, furniture, clock) ───────────────
+        // Repopulated every frame in drawRoom() with { wx, wy, wr, name } in world coords.
+        const objects = {};
+        let generalFocus = null; // key into `objects` currently focused, or null
+
         const btn = document.getElementById('editBtn');
         const hint = document.getElementById('hint');
+        const focusHint = document.getElementById('focusHint');
 
         btn.addEventListener('click', () => {
             editMode = !editMode;
@@ -132,6 +205,8 @@
             btn.textContent = editMode ? 'Guardar' : 'Editar';
             hint.classList.toggle('show', editMode);
             if (editMode) {
+                generalFocus = null;
+                focusHint.classList.remove('show');
                 secRunning = false;
                 // zoom into clock
                 targetZoom = 2.8;
@@ -146,11 +221,68 @@
             }
         });
 
-        canvas.addEventListener('contextmenu', e => { e.preventDefault(); if (editMode) { btn.click(); } });
+        canvas.addEventListener('contextmenu', e => {
+            e.preventDefault();
+            if (editMode) { btn.click(); }
+            else if (generalFocus) { clearFocus(); }
+        });
 
         // ─── HELPERS ──────────────────────────────────────────────────────────────────
         function lerp(a, b, t) { return a + (b - a) * t; }
         function easeOut(t) { return 1 - Math.pow(1 - t, 3); }
+
+        // ─── RESPONSIVE LAYOUT (two interfaces: desktop / mobile) ─────────────────────
+        // Desktop values below are numerically identical to the original fixed layout,
+        // so the desktop experience is unchanged. Mobile gets its own tuned proportions
+        // so the door, walls and clock don't look stretched on narrow/tall screens.
+        function getLayout() {
+            // IMPORTANT: this must NOT trigger on a short-but-wide desktop window
+            // (e.g. a browser resized to 1300x575) — only on genuine phone-sized
+            // viewports. So we key off width / true portrait orientation, never
+            // off height alone.
+            const portrait = H > W;      // phone/tablet held upright
+            const narrow = W < 880;      // catches phones even in landscape
+            const mobile = portrait || narrow;
+            if (mobile) {
+                return {
+                    mobile: true,
+                    vyF: 0.30,     // vanishing point height fraction
+                    bwF: 0.86,     // back wall width fraction of screen width
+                    bhF: 0.50,     // back wall height fraction of screen height
+                    doorWF: 0.40,  // door width, fraction of back wall width
+                    doorHF: 0.58,  // door height, fraction of back wall height
+                    editZoom: 2.6
+                };
+            }
+            return {
+                mobile: false,
+                vyF: 0.36,
+                bwF: 0.62,
+                bhF: 0.68,
+                doorWF: 0.28,
+                doorHF: 0.72,
+                editZoom: 2.8
+            };
+        }
+
+        // ─── FOCUS SYSTEM (generic "touch to zoom" for any object) ────────────────────
+        function focusOnObject(key) {
+            const o = objects[key];
+            if (!o) return;
+            generalFocus = key;
+            const dz = Math.min(3.4, Math.max(1.6, (Math.min(W, H) * 0.42) / o.wr));
+            targetZoom = dz;
+            targetTX = W / 2 - o.wx * dz;
+            targetTY = H / 2 - o.wy * dz;
+            focusHint.textContent = (o.name || 'Objeto') + ' — tocá de nuevo o clic derecho para volver';
+            focusHint.classList.add('show');
+        }
+
+        function clearFocus() {
+            generalFocus = null;
+            targetZoom = 1; targetTX = 0; targetTY = 0;
+            focusHint.classList.remove('show');
+        }
 
         // ─── SECONDS tick ─────────────────────────────────────────────────────────────
         let lastTs = 0;
@@ -186,15 +318,17 @@
 
         // ─── ROOM ─────────────────────────────────────────────────────────────────────
         function drawRoom() {
+            const L = getLayout();
+
             // vanishing point (world coords)
-            const vx = W / 2, vy = H * 0.36;
+            const vx = W / 2, vy = H * L.vyF;
 
             // Screen corners (world)
             const SW = W, SH = H;
 
             // Back wall rect — tall enough to show ceiling above
-            const bw = SW * 0.62;
-            const bh = SH * 0.68;
+            const bw = SW * L.bwF;
+            const bh = SH * L.bhF;
             const bx = vx - bw / 2;
             const by = vy - bh * 0.52;   // pushed up so ceiling gap is visible
             const bx2 = bx + bw, by2 = by + bh;
@@ -388,8 +522,8 @@
             ctx.beginPath(); ctx.moveTo(bx2, by2 - 8); ctx.lineTo(SW, SH - 5); ctx.stroke();
 
             // ── DOOR ────────────────────────────────────────────────────────
-            const dW = bw * 0.28;
-            const dH = bh * 0.72;
+            const dW = bw * L.doorWF;
+            const dH = bh * L.doorHF;
             const dX = vx - dW / 2;
             const dY = by2 - dH;
             drawDoor(dX, dY, dW, dH);
@@ -400,14 +534,67 @@
             const cY = dY - cR * 1.6;
             clockWX = cX; clockWY = cY; clockWR = cR;
 
-            // Recompute zoom target every frame so it's correct after resize
+            drawClock(cX, cY, cR);
+            objects.clock = { wx: cX, wy: cY, wr: cR * 1.05, name: 'Reloj de pared' };
+
+            // ── FURNITURE: paintings, table & shelf around the door ─────────
+            const leftGap = dX - bx;
+            const rightGap = bx2 - (dX + dW);
+
+            // Landscape paintings flanking the door, upper half of the wall
+            const pW = Math.min(leftGap * 0.68, bw * 0.22);
+            const pH = pW * 0.72;
+            const pCY = Math.max(by + pH / 2 + 16, by + bh * 0.30);
+
+            const pCX_L = bx + leftGap * 0.5;
+            drawPainting(pCX_L, pCY, pW, pH, 'mountain');
+            objects.paintingLeft = { wx: pCX_L, wy: pCY, wr: Math.max(pW, pH) * 0.62, name: 'Cuadro de montañas' };
+
+            const pW2 = Math.min(rightGap * 0.68, bw * 0.22);
+            const pH2 = pW2 * 0.72;
+            const pCX_R = dX + dW + rightGap * 0.5;
+            drawPainting(pCX_R, pCY, pW2, pH2, 'sea');
+            objects.paintingRight = { wx: pCX_R, wy: pCY, wr: Math.max(pW2, pH2) * 0.62, name: 'Cuadro de mar' };
+
+            // Small table with cup & plate, standing on the floor under the left painting
+            const tW = Math.min(leftGap * 0.72, bw * 0.20);
+            const tH = Math.min(tW * 0.85, bh * 0.20);
+            const tCX = pCX_L;
+            const tCY = by2 - tH / 2 - 4;
+            drawTable(tCX, tCY, tW, tH);
+            objects.table = { wx: tCX, wy: tCY, wr: Math.max(tW, tH) * 0.62, name: 'Mesa con taza y plato' };
+
+            // Wall shelf with a vase & books under/near the right painting
+            const shW = Math.min(rightGap * 0.72, bw * 0.20);
+            const shH = Math.min(shW * 0.55, bh * 0.14);
+            const shCX = pCX_R;
+            const shCY = by + bh * 0.62;
+            drawShelf(shCX, shCY, shW, shH);
+            objects.shelf = { wx: shCX, wy: shCY, wr: Math.max(shW, shH) * 0.68, name: 'Estante con jarrón' };
+
+            // Keep camera glued to whatever is currently focused (positions can
+            // shift slightly on resize, same idea as the clock's edit-mode zoom).
+            if (generalFocus && objects[generalFocus] && !editMode) {
+                const o = objects[generalFocus];
+                const dz = Math.min(3.4, Math.max(1.6, (Math.min(W, H) * 0.42) / o.wr));
+                targetZoom = dz;
+                targetTX = W / 2 - o.wx * dz;
+                targetTY = H / 2 - o.wy * dz;
+            }
             if (editMode) {
-                targetZoom = 2.8;
+                targetZoom = L.editZoom;
                 targetTX = W / 2 - cX * targetZoom;
                 targetTY = H / 2 - cY * targetZoom;
             }
 
-            drawClock(cX, cY, cR);
+            // Highlight ring around whatever is focused (generic version of the
+            // clock's own edit-mode ring, drawn for any touchable object).
+            if (generalFocus && objects[generalFocus]) {
+                const o = objects[generalFocus];
+                ctx.beginPath(); ctx.arc(o.wx, o.wy, o.wr + 6, 0, Math.PI * 2);
+                ctx.strokeStyle = 'rgba(255,210,50,0.85)'; ctx.lineWidth = 2.5;
+                ctx.setLineDash([8, 5]); ctx.stroke(); ctx.setLineDash([]);
+            }
         }
 
         // ─── REALISTIC WOOD FLOOR ────────────────────────────────────────────────────
@@ -582,6 +769,187 @@
             });
         }
 
+        // ─── PAINTINGS (landscapes) ─────────────────────────────────────────────────
+        function drawPainting(cx, cy, w, h, type) {
+            const x = cx - w / 2, y = cy - h / 2;
+
+            // cast shadow
+            ctx.fillStyle = 'rgba(0,0,0,0.30)';
+            ctx.fillRect(x + 4, y + 4, w, h);
+
+            // frame
+            const fp = w * 0.075;
+            let frameG = ctx.createLinearGradient(x, y, x + w, y + h);
+            frameG.addColorStop(0, '#6a4018'); frameG.addColorStop(0.5, '#8a5828'); frameG.addColorStop(1, '#4a2a0e');
+            ctx.fillStyle = frameG;
+            ctx.fillRect(x, y, w, h);
+            ctx.strokeStyle = 'rgba(255,200,110,0.25)'; ctx.lineWidth = 1.5;
+            ctx.strokeRect(x + 1, y + 1, w - 2, h - 2);
+
+            // canvas area (clipped)
+            const ix = x + fp, iy = y + fp, iw = w - fp * 2, ih = h - fp * 2;
+            ctx.save();
+            ctx.beginPath(); ctx.rect(ix, iy, iw, ih); ctx.clip();
+
+            if (type === 'mountain') {
+                let sky = ctx.createLinearGradient(ix, iy, ix, iy + ih);
+                sky.addColorStop(0, '#e8a768'); sky.addColorStop(0.5, '#f0c088'); sky.addColorStop(1, '#f4dcae');
+                ctx.fillStyle = sky; ctx.fillRect(ix, iy, iw, ih);
+
+                // sun
+                ctx.beginPath(); ctx.arc(ix + iw * 0.70, iy + ih * 0.32, ih * 0.14, 0, Math.PI * 2);
+                ctx.fillStyle = 'rgba(255,235,190,0.9)'; ctx.fill();
+
+                // far mountains
+                ctx.fillStyle = 'rgba(110,90,110,0.55)';
+                ctx.beginPath(); ctx.moveTo(ix, iy + ih * 0.62);
+                ctx.lineTo(ix + iw * 0.28, iy + ih * 0.35); ctx.lineTo(ix + iw * 0.5, iy + ih * 0.62);
+                ctx.closePath(); ctx.fill();
+
+                // near mountains
+                ctx.fillStyle = '#3a2c3a';
+                ctx.beginPath(); ctx.moveTo(ix, iy + ih * 0.72);
+                ctx.lineTo(ix + iw * 0.35, iy + ih * 0.30); ctx.lineTo(ix + iw * 0.62, iy + ih * 0.72);
+                ctx.closePath(); ctx.fill();
+                ctx.beginPath(); ctx.moveTo(ix + iw * 0.45, iy + ih * 0.72);
+                ctx.lineTo(ix + iw * 0.78, iy + ih * 0.42); ctx.lineTo(ix + iw, iy + ih * 0.72);
+                ctx.closePath(); ctx.fill();
+
+                // ground
+                ctx.fillStyle = '#2a3a26'; ctx.fillRect(ix, iy + ih * 0.72, iw, ih * 0.28);
+            } else {
+                // sea
+                let sky = ctx.createLinearGradient(ix, iy, ix, iy + ih * 0.55);
+                sky.addColorStop(0, '#7fb8d8'); sky.addColorStop(1, '#bcdcea');
+                ctx.fillStyle = sky; ctx.fillRect(ix, iy, iw, ih * 0.55);
+
+                ctx.beginPath(); ctx.arc(ix + iw * 0.25, iy + ih * 0.22, ih * 0.10, 0, Math.PI * 2);
+                ctx.fillStyle = 'rgba(255,250,220,0.85)'; ctx.fill();
+
+                let sea = ctx.createLinearGradient(ix, iy + ih * 0.55, ix, iy + ih);
+                sea.addColorStop(0, '#2e6f8a'); sea.addColorStop(1, '#164a5e');
+                ctx.fillStyle = sea; ctx.fillRect(ix, iy + ih * 0.55, iw, ih * 0.45);
+
+                // wave lines
+                ctx.strokeStyle = 'rgba(255,255,255,0.25)'; ctx.lineWidth = 1;
+                for (let i = 0; i < 4; i++) {
+                    const wy = iy + ih * 0.62 + i * ih * 0.08;
+                    ctx.beginPath(); ctx.moveTo(ix, wy); ctx.lineTo(ix + iw, wy + 2); ctx.stroke();
+                }
+
+                // little boat
+                ctx.fillStyle = '#241608';
+                ctx.beginPath();
+                ctx.moveTo(ix + iw * 0.62, iy + ih * 0.58);
+                ctx.lineTo(ix + iw * 0.74, iy + ih * 0.58);
+                ctx.lineTo(ix + iw * 0.70, iy + ih * 0.52);
+                ctx.closePath(); ctx.fill();
+                ctx.fillRect(ix + iw * 0.60, iy + ih * 0.585, iw * 0.16, ih * 0.02);
+            }
+            ctx.restore();
+
+            // inner bevel
+            ctx.strokeStyle = 'rgba(0,0,0,0.35)'; ctx.lineWidth = 2; ctx.strokeRect(ix, iy, iw, ih);
+        }
+
+        // ─── TABLE with cup & plate ─────────────────────────────────────────────────
+        function drawTable(cx, cy, w, h) {
+            const x = cx - w / 2, y = cy - h / 2;
+            const topH = h * 0.18;
+            // Bottom edge of the tabletop's front skirt (see skirt ellipse below) —
+            // legs must start exactly here, otherwise they float in mid-air.
+            const skirtBottomY = y + topH * 0.5 + topH * 0.35 + topH * 0.6;
+
+            // floor shadow
+            ctx.fillStyle = 'rgba(0,0,0,0.28)';
+            ctx.beginPath(); ctx.ellipse(cx, y + h + 4, w * 0.5, h * 0.09, 0, 0, Math.PI * 2); ctx.fill();
+
+            // legs — top end tucked a couple px INTO the skirt so the tabletop
+            // (drawn after, on top) covers the seam and the legs read as attached
+            ctx.strokeStyle = '#3a220c'; ctx.lineWidth = Math.max(2, w * 0.05); ctx.lineCap = 'round';
+            ctx.beginPath(); ctx.moveTo(x + w * 0.16, skirtBottomY - 3); ctx.lineTo(x + w * 0.11, y + h); ctx.stroke();
+            ctx.beginPath(); ctx.moveTo(x + w * 0.84, skirtBottomY - 3); ctx.lineTo(x + w * 0.89, y + h); ctx.stroke();
+
+            // tabletop (top ellipse)
+            let topG = ctx.createLinearGradient(x, y, x + w, y + topH);
+            topG.addColorStop(0, '#8a5828'); topG.addColorStop(0.5, '#a06c34'); topG.addColorStop(1, '#6e4420');
+            ctx.fillStyle = topG;
+            ctx.beginPath(); ctx.ellipse(cx, y + topH * 0.5, w * 0.5, topH * 0.6, 0, 0, Math.PI * 2); ctx.fill();
+            ctx.strokeStyle = 'rgba(0,0,0,0.25)'; ctx.lineWidth = 1.2; ctx.stroke();
+
+            // tabletop front edge (skirt)
+            ctx.fillStyle = '#5a3618';
+            ctx.beginPath(); ctx.ellipse(cx, y + topH * 0.5 + topH * 0.35, w * 0.5, topH * 0.6, 0, 0, Math.PI); ctx.fill();
+
+            // cup (mug)
+            const cupX = cx - w * 0.18, cupY = y + topH * 0.32;
+            ctx.fillStyle = '#e8e0d0';
+            ctx.beginPath(); ctx.roundRect(cupX - w * 0.05, cupY - h * 0.16, w * 0.10, h * 0.16, 3); ctx.fill();
+            ctx.strokeStyle = 'rgba(0,0,0,0.2)'; ctx.lineWidth = 1; ctx.stroke();
+            // handle
+            ctx.beginPath(); ctx.arc(cupX + w * 0.06, cupY - h * 0.08, h * 0.045, -Math.PI * 0.5, Math.PI * 0.5); ctx.stroke();
+            // coffee
+            ctx.fillStyle = '#4a2c14';
+            ctx.beginPath(); ctx.ellipse(cupX, cupY - h * 0.16, w * 0.05, h * 0.012, 0, 0, Math.PI * 2); ctx.fill();
+
+            // plate
+            const plateX = cx + w * 0.18, plateY = y + topH * 0.36;
+            ctx.beginPath(); ctx.ellipse(plateX, plateY, w * 0.14, h * 0.035, 0, 0, Math.PI * 2);
+            ctx.fillStyle = '#f4efe2'; ctx.fill();
+            ctx.strokeStyle = 'rgba(0,0,0,0.25)'; ctx.lineWidth = 1; ctx.stroke();
+            ctx.beginPath(); ctx.ellipse(plateX, plateY, w * 0.09, h * 0.02, 0, 0, Math.PI * 2);
+            ctx.strokeStyle = 'rgba(0,0,0,0.15)'; ctx.stroke();
+        }
+
+        // ─── WALL SHELF with vase & books ───────────────────────────────────────────
+        function drawShelf(cx, cy, w, h) {
+            const x = cx - w / 2, y = cy - h / 2;
+
+            // bracket shadow
+            ctx.fillStyle = 'rgba(0,0,0,0.22)';
+            ctx.fillRect(x + 3, y + h * 0.6 + 3, w, h * 0.18);
+
+            // plank
+            let plankG = ctx.createLinearGradient(x, y + h * 0.6, x, y + h * 0.78);
+            plankG.addColorStop(0, '#8a5828'); plankG.addColorStop(1, '#5e3a18');
+            ctx.fillStyle = plankG;
+            ctx.fillRect(x, y + h * 0.6, w, h * 0.18);
+            ctx.strokeStyle = 'rgba(0,0,0,0.3)'; ctx.lineWidth = 1; ctx.strokeRect(x, y + h * 0.6, w, h * 0.18);
+
+            // brackets
+            ctx.strokeStyle = '#3a220c'; ctx.lineWidth = Math.max(2, w * 0.03);
+            ctx.beginPath(); ctx.moveTo(x + w * 0.12, y + h * 0.78); ctx.lineTo(x + w * 0.12, y + h * 0.95); ctx.stroke();
+            ctx.beginPath(); ctx.moveTo(x + w * 0.88, y + h * 0.78); ctx.lineTo(x + w * 0.88, y + h * 0.95); ctx.stroke();
+
+            // vase
+            const vx0 = x + w * 0.32, vy0 = y + h * 0.6;
+            ctx.fillStyle = '#5a7a68';
+            ctx.beginPath();
+            ctx.moveTo(vx0 - w * 0.07, vy0);
+            ctx.quadraticCurveTo(vx0 - w * 0.11, vy0 - h * 0.30, vx0 - w * 0.03, vy0 - h * 0.44);
+            ctx.lineTo(vx0 + w * 0.03, vy0 - h * 0.44);
+            ctx.quadraticCurveTo(vx0 + w * 0.11, vy0 - h * 0.30, vx0 + w * 0.07, vy0);
+            ctx.closePath(); ctx.fill();
+            ctx.strokeStyle = 'rgba(0,0,0,0.2)'; ctx.lineWidth = 1; ctx.stroke();
+
+            // dried flowers / twigs
+            ctx.strokeStyle = '#7a6438'; ctx.lineWidth = 1.3;
+            for (let i = -1; i <= 1; i++) {
+                ctx.beginPath(); ctx.moveTo(vx0 + i * w * 0.02, vy0 - h * 0.42);
+                ctx.lineTo(vx0 + i * w * 0.06, vy0 - h * 0.72 - i * h * 0.05); ctx.stroke();
+            }
+
+            // little book stack
+            const bx0 = x + w * 0.70, by0 = y + h * 0.6;
+            const bookColors = ['#7a2e20', '#2e4a6a', '#4a6a2e'];
+            bookColors.forEach((c, i) => {
+                ctx.fillStyle = c;
+                ctx.fillRect(bx0 - w * 0.13, by0 - (i + 1) * h * 0.07, w * 0.26, h * 0.065);
+                ctx.strokeStyle = 'rgba(0,0,0,0.25)'; ctx.lineWidth = 0.8;
+                ctx.strokeRect(bx0 - w * 0.13, by0 - (i + 1) * h * 0.07, w * 0.26, h * 0.065);
+            });
+        }
+
         // ─── CLOCK ───────────────────────────────────────────────────────────────────
         function drawClock(cx, cy, r) {
             // Wall mounting shadow
@@ -709,7 +1077,7 @@
 
         function getPos(e) {
             const rect = canvas.getBoundingClientRect();
-            const t = e.touches ? e.touches[0] : e;
+            const t = e.changedTouches ? e.changedTouches[0] : (e.touches ? e.touches[0] : e);
             return { x: t.clientX - rect.left, y: t.clientY - rect.top };
         }
 
@@ -722,6 +1090,7 @@
             return ((a % (Math.PI * 2)) + Math.PI * 2) % (Math.PI * 2);
         }
 
+        // ── Clock hand dragging (unchanged — only active while in "Editar" mode) ──
         canvas.addEventListener('mousedown', e => {
             if (!editMode) return;
             const sp = getPos(e);
@@ -757,8 +1126,8 @@
         });
 
         canvas.addEventListener('touchstart', e => {
+            if (!editMode) return; // let plain taps fall through to the click handler below
             e.preventDefault();
-            if (!editMode) return;
             const sp = getPos(e); const wp = screenToWorld(sp.x, sp.y); const f = clockWR * 0.84;
             const ha = ((hHour % 12) / 12) * Math.PI * 2 - Math.PI / 2;
             const ma = ((hMin % 60) / 60) * Math.PI * 2 - Math.PI / 2;
@@ -772,8 +1141,8 @@
         }, { passive: false });
 
         canvas.addEventListener('touchmove', e => {
-            e.preventDefault();
             if (!drag) return;
+            e.preventDefault();
             const sp = getPos(e); const wp = screenToWorld(sp.x, sp.y); const a = angleTo(wp);
             if (drag === 'h') hHour = (a / (Math.PI * 2)) * 12;
             else if (drag === 'm') hMin = (a / (Math.PI * 2)) * 60;
@@ -783,6 +1152,39 @@
         canvas.addEventListener('touchend', e => {
             if (!drag) return;
             drag = null; saveTime();
+        });
+
+        // ── Generic "touch an object to look at it" — clock, paintings, table, shelf ──
+        // Works with mouse clicks AND taps (touch devices fire a synthetic 'click').
+        canvas.addEventListener('click', e => {
+            if (editMode || drag) return;
+            const sp = getPos(e);
+            const wp = screenToWorld(sp.x, sp.y);
+            let hitKey = null, hitDist = Infinity;
+            for (const key in objects) {
+                const o = objects[key];
+                const d = Math.hypot(wp.x - o.wx, wp.y - o.wy);
+                if (d < o.wr && d < hitDist) { hitDist = d; hitKey = key; }
+            }
+            if (hitKey) {
+                if (generalFocus === hitKey) clearFocus();
+                else focusOnObject(hitKey);
+            } else if (generalFocus) {
+                clearFocus();
+            }
+        });
+
+        // Pointer hover feedback on devices with a mouse
+        canvas.addEventListener('mousemove', e => {
+            if (editMode || drag) return;
+            const sp = getPos(e);
+            const wp = screenToWorld(sp.x, sp.y);
+            let hovering = false;
+            for (const key in objects) {
+                const o = objects[key];
+                if (Math.hypot(wp.x - o.wx, wp.y - o.wy) < o.wr) { hovering = true; break; }
+            }
+            canvas.style.cursor = hovering ? 'pointer' : 'default';
         });
 
         // Start
