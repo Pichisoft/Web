@@ -34,10 +34,39 @@
       font-size: 14px;
       color: #aaa;
     }
+
+    /* ── HEADER ── */
+    .header {
+      position: fixed;
+      top: 20px;
+      left: 25px;
+      display: flex;
+      align-items: baseline;
+      gap: 8px;
+      z-index: 100;
+    }
+
+    .logo {
+      font-family: "Times New Roman", Times, serif;
+      font-size: 2.2rem;
+      font-weight: bold;
+      color: white;
+    }
+
+    .byline {
+      font-family: Arial, sans-serif;
+      font-size: 0.9rem;
+      font-style: italic;
+      color: #bdbdbd;
+    }
   </style>
 </head>
 
 <body>
+  <div class="header">
+    <div class="logo">PichonDestiny</div>
+    <div class="byline">- By Pichisoft -</div>
+  </div>
 
   <div id="container">
     <div id="respuesta"></div>
@@ -57,7 +86,7 @@
       "MARTA, HMMMM....",
       "SE VIENE ALGO BUENO",
       "MALA IDEA",
-      "HACÉLO",
+      "HACELO",
       "NO HAY CHANCE",
       "PUEDE SALIR MAL",
       "PUEDE SALIR MUY BIEN",
