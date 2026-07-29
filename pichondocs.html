@@ -7,22 +7,79 @@
     <title>PichonDocs</title>
 
     <style>
+        * {
+            box-sizing: border-box;
+        }
+
         body {
             margin: 0;
             display: flex;
+            flex-direction: column;
             height: 100vh;
-            font-family: Arial;
+            font-family: Arial, sans-serif;
             background: #111;
             color: #eee;
         }
 
+        /* ===== HEADER ===== */
+        .appHeader {
+            display: flex;
+            align-items: baseline;
+            gap: 10px;
+            padding: 12px 18px;
+            background: #1b1b1b;
+            border-bottom: 1px solid #333;
+            flex-shrink: 0;
+        }
+
+        .appHeader .brand {
+            font-family: "Times New Roman", Times, serif;
+            font-weight: bold;
+            font-size: 26px;
+            color: #eee;
+            letter-spacing: 0.5px;
+        }
+
+        .appHeader .tagline {
+            font-family: Arial, sans-serif;
+            font-style: italic;
+            font-size: 14px;
+            color: #999;
+        }
+
+        /* ===== BODY WRAPPER ===== */
+        .bodyWrap {
+            flex: 1;
+            display: flex;
+            min-height: 0;
+        }
+
         /* SIDEBAR */
         .sidebar {
-            width: 270px;
+            width: 280px;
             background: #1b1b1b;
             padding: 10px;
             overflow-y: auto;
             border-right: 1px solid #333;
+            display: flex;
+            flex-direction: column;
+        }
+
+        .searchBox {
+            position: relative;
+            margin-bottom: 10px;
+        }
+
+        .searchBox input {
+            width: 100%;
+            padding: 9px 10px;
+        }
+
+        .newNoteBtn {
+            width: 100%;
+            margin-bottom: 10px;
+            padding: 9px;
+            font-weight: bold;
         }
 
         .note {
@@ -31,10 +88,34 @@
             background: #2a2a2a;
             border-radius: 8px;
             cursor: pointer;
+            border-left: 4px solid transparent;
+            transition: background 0.15s ease, transform 0.1s ease;
+        }
+
+        .note:hover {
+            background: #333;
+            transform: translateX(2px);
         }
 
         .note.active {
-            outline: 2px solid #555;
+            background: #333;
+            border-left: 4px solid #a855f7;
+        }
+
+        .note .noteSnippet {
+            font-size: 12px;
+            color: #999;
+            margin-top: 4px;
+            white-space: nowrap;
+            overflow: hidden;
+            text-overflow: ellipsis;
+        }
+
+        .noResults {
+            color: #777;
+            font-size: 13px;
+            text-align: center;
+            padding: 20px 5px;
         }
 
         /* MAIN */
@@ -42,6 +123,7 @@
             flex: 1;
             display: flex;
             flex-direction: column;
+            min-width: 0;
         }
 
         .toolbar {
@@ -50,164 +132,446 @@
             padding: 10px;
             background: #1b1b1b;
             border-bottom: 1px solid #333;
+            align-items: center;
+            flex-wrap: wrap;
+        }
 
+        .toolbar .noteSearchWrap {
+            display: flex;
+            gap: 6px;
+            flex: 1;
+            min-width: 180px;
+        }
+
+        .toolbar .noteSearchWrap input {
+            flex: 1;
+        }
+
+        .spacer {
+            flex: 1;
         }
 
         button,
-        input {
+        input,
+        select {
             background: #222;
             color: #eee;
             border: 1px solid #444;
             border-radius: 6px;
-            padding: 6px;
+            padding: 7px 10px;
             cursor: pointer;
+            font-family: Arial, sans-serif;
+            font-size: 13px;
         }
 
-        textarea {
+        button:hover {
+            background: #2c2c2c;
+        }
+
+        button:active {
+            transform: scale(0.97);
+        }
+
+        button.toggled {
+            background: #a855f7;
+            border-color: #a855f7;
+            color: #111;
+        }
+
+        /* ===== FORMAT MENU (estilo Google Keep, propio) ===== */
+        .formatMenuWrap {
+            position: relative;
+        }
+
+        .formatPanel {
+            display: none;
+            position: absolute;
+            top: 110%;
+            left: 0;
+            background: #1e1e1e;
+            border: 1px solid #3a3a3a;
+            border-radius: 10px;
+            padding: 14px;
+            width: 300px;
+            z-index: 500;
+            box-shadow: 0 10px 30px rgba(0, 0, 0, 0.5);
+        }
+
+        .formatPanel.open {
+            display: block;
+        }
+
+        .formatRow {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            margin-bottom: 10px;
+        }
+
+        .formatRow label {
+            font-size: 11px;
+            color: #999;
+            width: 60px;
+            flex-shrink: 0;
+        }
+
+        .formatRow select {
             flex: 1;
-            padding: 15px;
-            font-size: 15px;
-            border: none;
-            outline: none;
-            background: #111;
-            color: #ddd;
         }
 
-        .titleWrap {
-            padding: 10px 15px;
-        }
-
-        .titleText {
-            font-size: 18px;
-            font-weight: bold;
-            outline: none;
-        }
-
-        /* 🎨 PALETTE */
-        .palette {
+        .styleBtns {
             display: flex;
             gap: 6px;
-            padding: 0 10px 10px 10px;
+            flex: 1;
+        }
+
+        .styleBtns button {
+            flex: 1;
+            font-weight: bold;
+        }
+
+        .styleBtns button:nth-child(2) {
+            font-style: italic;
+        }
+
+        .styleBtns button:nth-child(3) {
+            text-decoration: underline;
+        }
+
+        .paletteGrid {
+            display: flex;
+            gap: 8px;
+            flex-wrap: wrap;
         }
 
         .colorBtn {
-            width: 18px;
-            height: 18px;
+            width: 22px;
+            height: 22px;
             border-radius: 50%;
             cursor: pointer;
             border: 2px solid transparent;
         }
 
-        .selected {
+        .colorBtn.selected {
             border: 2px solid #fff;
         }
 
-        /* 🔐 AUTH */
+        /* ===== DROPDOWN PROPIO (no le saca el foco al editor) ===== */
+        .customSelect {
+            position: relative;
+            flex: 1;
+        }
+
+        .customSelectBtn {
+            width: 100%;
+            text-align: left;
+            display: flex;
+            justify-content: space-between;
+        }
+
+        .customDropdown {
+            display: none;
+            position: absolute;
+            top: 105%;
+            left: 0;
+            right: 0;
+            background: #262626;
+            border: 1px solid #444;
+            border-radius: 8px;
+            max-height: 220px;
+            overflow-y: auto;
+            z-index: 600;
+        }
+
+        .customDropdown.open {
+            display: block;
+        }
+
+        .customDropdown div {
+            padding: 8px 10px;
+            cursor: pointer;
+            font-size: 13px;
+        }
+
+        .customDropdown div:hover {
+            background: #363636;
+        }
+
+        /* ===== NOTE AREA ===== */
+        .titleWrap {
+            padding: 16px 20px 4px 20px;
+        }
+
+        .titleText {
+            font-size: 20px;
+            font-weight: bold;
+            outline: none;
+            min-height: 28px;
+            padding: 4px 2px;
+            border-bottom: 1px solid #262626;
+        }
+
+        .titleText:empty:before {
+            content: attr(data-placeholder);
+            color: #555;
+        }
+
+        #content {
+            flex: 1;
+            padding: 16px 20px;
+            font-size: 15px;
+            line-height: 1.6;
+            outline: none;
+            background: #111;
+            color: #ddd;
+            font-family: Arial, sans-serif;
+            overflow-y: auto;
+        }
+
+        #content:empty:before {
+            content: attr(data-placeholder);
+            color: #555;
+        }
+
+        mark.pichon-hl {
+            background: rgba(168, 85, 247, 0.85);
+            color: #111;
+            border-radius: 3px;
+            padding: 0 1px;
+            animation: pichonFill 2.2s ease forwards;
+        }
+
+        @keyframes pichonFill {
+            0% {
+                background: rgba(168, 85, 247, 0.9);
+            }
+
+            55% {
+                background: rgba(168, 85, 247, 0.9);
+            }
+
+            100% {
+                background: rgba(168, 85, 247, 0);
+                color: inherit;
+            }
+        }
+
+        .autosaveTag {
+            font-size: 11px;
+            color: #666;
+            padding: 0 20px 10px 20px;
+            height: 14px;
+        }
+
+        /* ===== MODALS ===== */
         .modal {
             position: fixed;
             inset: 0;
-            background: rgba(0, 0, 0, 0.92);
-            display: flex;
+            background: rgba(0, 0, 0, 0.75);
+            display: none;
             align-items: center;
             justify-content: center;
             z-index: 9999;
+            animation: fadeIn 0.15s ease;
+        }
+
+        @keyframes fadeIn {
+            from {
+                opacity: 0;
+            }
+
+            to {
+                opacity: 1;
+            }
+        }
+
+        .modal.show {
+            display: flex;
         }
 
         .box {
             background: #1b1b1b;
-            padding: 20px;
-            border-radius: 10px;
+            padding: 22px;
+            border-radius: 12px;
             width: 320px;
             text-align: center;
+            border: 1px solid #333;
         }
 
-        .box input {
-            width: 100%;
-            margin: 5px 0;
+        .box h3 {
+            margin-top: 0;
+            font-family: "Times New Roman", Times, serif;
         }
 
-        .link {
-            font-size: 12px;
-            color: #aaa;
-            cursor: pointer;
-            display: block;
-            margin-top: 6px;
+        .box .noteName {
+            color: #a855f7;
+            font-weight: bold;
+        }
+
+        .box .modalBtns {
+            display: flex;
+            gap: 10px;
+            margin-top: 14px;
+        }
+
+        .box .modalBtns button {
+            flex: 1;
         }
 
         .danger {
             background: #b91c1c;
-            margin-top: 8px;
+            border-color: #b91c1c;
+        }
+
+        .danger:hover {
+            background: #d32323;
         }
     </style>
 </head>
 
 <body>
 
-    <!-- 🔐 LOGIN -->
-    <div class="modal" id="authModal">
+    <!-- HEADER -->
+    <div class="appHeader">
+        <div class="brand">PichonDocs</div>
+        <div class="tagline">- By Pichisoft -</div>
+    </div>
 
+    <div class="bodyWrap">
+
+        <!-- SIDEBAR -->
+        <div class="sidebar">
+            <button class="newNoteBtn" onclick="newNote()">+ Nueva nota</button>
+
+            <div class="searchBox">
+                <input id="globalSearch" placeholder="Buscar notas..." oninput="render()" />
+            </div>
+
+            <div id="list"></div>
+        </div>
+
+        <!-- MAIN -->
+        <div class="main">
+
+            <div class="toolbar">
+                <div class="formatMenuWrap">
+                    <button onmousedown="event.preventDefault()" onclick="toggleFormatPanel()">🎨 Formato</button>
+
+                    <div class="formatPanel" id="formatPanel">
+                        <div class="formatRow">
+                            <label>Fuente</label>
+                            <div class="customSelect">
+                                <button type="button" class="customSelectBtn" id="fontSelectBtn"
+                                    onmousedown="event.preventDefault()" onclick="toggleDropdown('fontDropdown')">Arial
+                                    ▾</button>
+                                <div class="customDropdown" id="fontDropdown">
+                                    <div onmousedown="event.preventDefault()" onclick="chooseFont('Arial')">Arial</div>
+                                    <div onmousedown="event.preventDefault()" onclick="chooseFont('Times New Roman')">
+                                        Times New Roman</div>
+                                    <div onmousedown="event.preventDefault()" onclick="chooseFont('Georgia')">Georgia
+                                    </div>
+                                    <div onmousedown="event.preventDefault()" onclick="chooseFont('Courier New')">
+                                        Courier New</div>
+                                    <div onmousedown="event.preventDefault()" onclick="chooseFont('Verdana')">Verdana
+                                    </div>
+                                    <div onmousedown="event.preventDefault()" onclick="chooseFont('Trebuchet MS')">
+                                        Trebuchet MS</div>
+                                    <div onmousedown="event.preventDefault()" onclick="chooseFont('Comic Sans MS')">
+                                        Comic Sans MS</div>
+                                    <div onmousedown="event.preventDefault()" onclick="chooseFont('Brush Script MT')"
+                                        style="font-family:'Brush Script MT', cursive;">Brush Script MT (cursiva)</div>
+                                    <div onmousedown="event.preventDefault()" onclick="chooseFont('Impact')">Impact
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+
+                        <div class="formatRow">
+                            <label>Tamaño</label>
+                            <div class="customSelect">
+                                <button type="button" class="customSelectBtn" id="sizeSelectBtn"
+                                    onmousedown="event.preventDefault()" onclick="toggleDropdown('sizeDropdown')">Normal
+                                    ▾</button>
+                                <div class="customDropdown" id="sizeDropdown">
+                                    <div onmousedown="event.preventDefault()" onclick="chooseSize('13px','Pequeño')">
+                                        Pequeño</div>
+                                    <div onmousedown="event.preventDefault()" onclick="chooseSize('16px','Normal')">
+                                        Normal</div>
+                                    <div onmousedown="event.preventDefault()" onclick="chooseSize('22px','Grande')">
+                                        Grande</div>
+                                    <div onmousedown="event.preventDefault()" onclick="chooseSize('30px','Enorme')">
+                                        Enorme</div>
+                                </div>
+                            </div>
+                        </div>
+
+                        <div class="formatRow">
+                            <label>Estilo</label>
+                            <div class="styleBtns">
+                                <button id="boldBtn" onmousedown="event.preventDefault()"
+                                    onclick="toggleStyle('fontWeight','bold','normal')">B</button>
+                                <button id="italicBtn" onmousedown="event.preventDefault()"
+                                    onclick="toggleStyle('fontStyle','italic','normal')">I</button>
+                                <button id="underlineBtn" onmousedown="event.preventDefault()"
+                                    onclick="toggleStyle('textDecorationLine','underline','none')">U</button>
+                            </div>
+                        </div>
+
+                        <div class="formatRow">
+                            <label>Color</label>
+                            <div class="paletteGrid" id="palette"></div>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="noteSearchWrap">
+                    <input id="noteSearch" placeholder="Buscar dentro de la nota... (varias palabras)"
+                        onkeydown="if(event.key==='Enter') searchInNote()" />
+                    <button onclick="searchInNote()">🔍</button>
+                </div>
+
+                <div class="spacer"></div>
+
+                <button onclick="downloadTXT()">⬇ TXT</button>
+                <button onclick="deleteNote()">🗑️ Eliminar</button>
+            </div>
+
+            <div class="titleWrap">
+                <div id="titleView" class="titleText" contenteditable="true" data-placeholder="Título"></div>
+            </div>
+
+            <div class="autosaveTag" id="autosaveTag"></div>
+
+            <div id="content" contenteditable="true" data-placeholder="Escribí tu nota acá..."></div>
+
+        </div>
+
+    </div>
+
+    <!-- MODAL BORRAR -->
+    <div class="modal" id="deleteModal">
         <div class="box">
-
-            <h3>PichonDocs</h3>
-
-            <!-- LOGIN -->
-            <div id="loginBox">
-                <p>Iniciar sesión</p>
-                <input id="loginUser" placeholder="Usuario" />
-                <input id="loginPass" type="password" placeholder="Contraseña" />
-                <button onclick="login()">Entrar</button>
-
-                <span class="link" onclick="showRegister()">Crear cuenta</span>
-                <span class="link" onclick="resetAll()">Restablecer datos</span>
+            <h3>Eliminar nota</h3>
+            <p>¿Querés eliminar <span class="noteName" id="deleteNoteName"></span>? Esta acción no se puede deshacer.
+            </p>
+            <div class="modalBtns">
+                <button onclick="cancelDelete()">Cancelar</button>
+                <button class="danger" onclick="confirmDelete()">Eliminar</button>
             </div>
-
-            <!-- REGISTER -->
-            <div id="registerBox" style="display:none;">
-                <p>Crear cuenta</p>
-                <input id="regUser" placeholder="Usuario único" />
-                <input id="regPass" type="password" placeholder="Contraseña" />
-                <button onclick="register()">Crear cuenta</button>
-
-                <span class="link" onclick="showLogin()">Volver</span>
-            </div>
-
         </div>
-
-    </div>
-
-    <!-- APP -->
-    <div class="sidebar">
-        <button onclick="newNote()">+ Nueva nota</button>
-        <div id="list"></div>
-    </div>
-
-    <div class="main">
-
-        <div class="toolbar">
-            <div class="toolbar"> </div>
-            <button onclick="downloadTXT()">⬇ TXT</button>
-            <button onclick="saveNote()">💾 Guardar</button>
-            <button onclick="deleteNote()">🗑️ Eliminar</button>
-        </div>
-
-        <!-- 🎨 PALETTE RESTAURADA -->
-        <div class="palette" id="palette"></div>
-
-        <div class="titleWrap">
-            <div id="titleView" class="titleText" contenteditable="true"></div>
-        </div>
-
-        <textarea id="content"></textarea>
-
     </div>
 
     <script>
 
-        let currentUser = null;
         let notes = [];
         let currentId = null;
+        let activeEditable = null;
+        let savedRange = null;
+        let pendingDeleteId = null;
+        let saveTimeout = null;
 
-        /* 🎨 COLORS */
+        const STORAGE_KEY = "pichon_notes_v2";
+
         const colors = [
             "#666666", "#ffffff", "#a855f7",
             "#3b82f6", "#22c55e", "#eab308", "#ef4444"
@@ -215,137 +579,118 @@
 
         let selectedColor = colors[0];
 
-        /* USERS */
-        function getUsers() {
-            return JSON.parse(localStorage.getItem("pichon_users") || "[]");
+        /* ================= STORAGE ================= */
+
+        function loadStorage() {
+            notes = JSON.parse(localStorage.getItem(STORAGE_KEY) || "[]");
         }
-
-        function saveUsers(u) {
-            localStorage.setItem("pichon_users", JSON.stringify(u));
-        }
-
-        /* NOTES KEY */
-        function key() {
-            return "pichon_notes_" + currentUser;
-        }
-
-        /* ================= LOGIN ================= */
-
-        function login() {
-            let u = loginUser.value.trim();
-            let p = loginPass.value;
-
-            let users = getUsers();
-            let found = users.find(x => x.user === u);
-
-            if (!found) return alert("Usuario incorrecto");
-            if (found.pass !== p) return alert("Contraseña incorrecta");
-
-            currentUser = u;
-            start();
-        }
-
-        /* ================= REGISTER ================= */
-
-        function register() {
-            let u = regUser.value.trim();
-            let p = regPass.value;
-
-            if (!u || !p) return alert("Completar campos");
-
-            let users = getUsers();
-
-            if (users.find(x => x.user === u)) {
-                return alert("Ese usuario ya existe");
-            }
-
-            users.push({ user: u, pass: p });
-            saveUsers(users);
-
-            alert("Cuenta creada");
-            showLogin();
-        }
-
-        /* ================= RESET ================= */
-
-        function resetAll() {
-            if (!confirm("Esto borra TODO (usuarios + notas)")) return;
-
-            localStorage.clear();
-            location.reload();
-        }
-
-        /* ================= UI ================= */
-
-        function showRegister() {
-            loginBox.style.display = "none";
-            registerBox.style.display = "block";
-        }
-
-        function showLogin() {
-            loginBox.style.display = "block";
-            registerBox.style.display = "none";
-        }
-
-        /* ================= SESSION ================= */
-
-        function start() {
-            authModal.style.display = "none";
-
-            notes = JSON.parse(localStorage.getItem(key()) || "[]");
-
-            render();
-
-            if (notes.length) loadNote(notes[0].id);
-
-            renderPalette();
-        }
-
-        /* ================= NOTES ================= */
 
         function saveStorage() {
-            localStorage.setItem(key(), JSON.stringify(notes));
+            localStorage.setItem(STORAGE_KEY, JSON.stringify(notes));
+        }
+
+        /* ================= INIT ================= */
+
+        function start() {
+            loadStorage();
+            renderPalette();
+            render();
+
+            if (notes.length) {
+                loadNote(notes[0].id);
+            } else {
+                newNote();
+            }
+
+            trackSelection(titleView);
+            trackSelection(content);
+
+            document.addEventListener("selectionchange", updateStyleButtons);
+            document.addEventListener("click", (e) => {
+                const panel = document.getElementById("formatPanel");
+                const wrap = document.querySelector(".formatMenuWrap");
+                if (panel.classList.contains("open") && !wrap.contains(e.target)) {
+                    panel.classList.remove("open");
+                }
+
+                document.querySelectorAll(".customSelect").forEach(cs => {
+                    if (!cs.contains(e.target)) {
+                        cs.querySelector(".customDropdown").classList.remove("open");
+                    }
+                });
+            });
+            window.addEventListener("beforeunload", flushSave);
         }
 
         function newNote() {
+            flushSave();
+
             let n = {
                 id: Date.now(),
-                title: "Nueva nota",
+                title: "",
                 content: "",
                 color: selectedColor
             };
 
-            notes.push(n);
+            notes.unshift(n);
             currentId = n.id;
 
             saveStorage();
             render();
             loadNote(n.id);
+            titleView.focus();
         }
 
         function loadNote(id) {
+            flushSave();
+
             let n = notes.find(x => x.id === id);
             if (!n) return;
 
             currentId = id;
 
-            titleView.innerText = n.title;
-            content.value = n.content;
+            titleView.innerHTML = n.title || "";
+            content.innerHTML = n.content || "";
 
-            selectedColor = n.color || "#666666";
-
-            titleView.style.color = selectedColor;
+            selectedColor = n.color || colors[0];
 
             renderPalette();
             render();
         }
 
-        function saveNote() {
-            let n = notes.find(x => x.id === currentId);
+        function getCurrentNote() {
+            return notes.find(x => x.id === currentId);
+        }
+
+        function scheduleSave() {
+            clearTimeout(saveTimeout);
+            document.getElementById("autosaveTag").innerText = "Guardando...";
+            saveTimeout = setTimeout(() => {
+                silentSave();
+                saveTimeout = null;
+                document.getElementById("autosaveTag").innerText = "Guardado ✓";
+                setTimeout(() => {
+                    document.getElementById("autosaveTag").innerText = "";
+                }, 1500);
+            }, 500);
+        }
+
+        // Fuerza el guardado inmediato si hay un autoguardado pendiente
+        function flushSave() {
+            if (saveTimeout) {
+                clearTimeout(saveTimeout);
+                saveTimeout = null;
+                silentSave();
+                document.getElementById("autosaveTag").innerText = "";
+            }
+        }
+
+        function silentSave() {
+            let n = getCurrentNote();
             if (!n) return;
 
-            n.title = titleView.innerText;
-            n.content = content.value;
+            n.title = titleView.innerHTML;
+            n.content = content.innerHTML;
             n.color = selectedColor;
 
             saveStorage();
@@ -353,16 +698,27 @@
         }
 
         function deleteNote() {
-            let n = notes.find(x => x.id === currentId);
+            let n = getCurrentNote();
             if (!n) return;
 
-            let ok = confirm(`¿Querés eliminar la nota "${n.title}"? Esta acción no se puede deshacer.`);
+            pendingDeleteId = n.id;
+            document.getElementById("deleteNoteName").innerText = plainText(n.title) || "esta nota";
+            document.getElementById("deleteModal").classList.add("show");
+        }
 
-            if (!ok) return;
+        function cancelDelete() {
+            pendingDeleteId = null;
+            document.getElementById("deleteModal").classList.remove("show");
+        }
 
-            notes = notes.filter(x => x.id !== currentId);
+        function confirmDelete() {
+            if (pendingDeleteId == null) return;
+
+            notes = notes.filter(x => x.id !== pendingDeleteId);
             saveStorage();
 
+            document.getElementById("deleteModal").classList.remove("show");
+            pendingDeleteId = null;
             currentId = null;
 
             render();
@@ -370,26 +726,205 @@
             if (notes.length > 0) {
                 loadNote(notes[0].id);
             } else {
-                titleView.innerText = "";
-                content.value = "";
+                newNote();
             }
         }
-        /* ================= RENDER ================= */
+
+        /* ================= RENDER SIDEBAR ================= */
+
+        function plainText(html) {
+            let d = document.createElement("div");
+            d.innerHTML = html || "";
+            return d.innerText || d.textContent || "";
+        }
+
+        function normalize(str) {
+            return (str || "").toLowerCase();
+        }
 
         function render() {
+            const query = normalize(document.getElementById("globalSearch") ? globalSearch.value.trim() : "");
+            const words = query.split(/\s+/).filter(Boolean);
+
             list.innerHTML = "";
 
-            notes.forEach(n => {
+            let filtered = notes.filter(n => {
+                if (!words.length) return true;
+                const combined = normalize(plainText(n.title) + " " + plainText(n.content));
+                return words.every(w => combined.includes(w));
+            });
+
+            if (!filtered.length) {
                 let div = document.createElement("div");
-                div.className = "note";
-                div.innerText = n.title;
-                div.style.color = n.color;
+                div.className = "noResults";
+                div.innerText = "No se encontraron notas.";
+                list.appendChild(div);
+                return;
+            }
+
+            filtered.forEach(n => {
+                let div = document.createElement("div");
+                div.className = "note" + (n.id === currentId ? " active" : "");
+
+                let titleText = plainText(n.title) || "Sin título";
+                let snippetText = plainText(n.content);
+
+                let titleEl = document.createElement("div");
+                titleEl.style.color = n.color || "#eee";
+                titleEl.style.fontWeight = "bold";
+                titleEl.innerText = titleText;
+
+                let snippetEl = document.createElement("div");
+                snippetEl.className = "noteSnippet";
+                snippetEl.innerText = snippetText;
+
+                div.appendChild(titleEl);
+                div.appendChild(snippetEl);
+
                 div.onclick = () => loadNote(n.id);
                 list.appendChild(div);
             });
         }
 
-        /* ================= 🎨 PALETTE ================= */
+        /* ================= FORMAT MENU ================= */
+
+        function toggleFormatPanel() {
+            const panel = document.getElementById("formatPanel");
+            panel.classList.toggle("open");
+            if (!panel.classList.contains("open")) flushSave();
+        }
+
+        function toggleDropdown(id) {
+            document.querySelectorAll(".customDropdown").forEach(d => {
+                if (d.id !== id) d.classList.remove("open");
+            });
+            document.getElementById(id).classList.toggle("open");
+        }
+
+        function chooseFont(name) {
+            document.getElementById("fontSelectBtn").textContent = name + " ▾";
+            document.getElementById("fontDropdown").classList.remove("open");
+            applyStyle({ fontFamily: name });
+        }
+
+        function chooseSize(px, label) {
+            document.getElementById("sizeSelectBtn").textContent = label + " ▾";
+            document.getElementById("sizeDropdown").classList.remove("open");
+            applyStyle({ fontSize: px });
+        }
+
+        function trackSelection(el) {
+            el.addEventListener("focus", () => { activeEditable = el; });
+            el.addEventListener("input", () => {
+                scheduleSave();
+            });
+            el.addEventListener("blur", () => {
+                flushSave();
+            });
+        }
+
+        // Rastrea la selección en todo momento, sin depender de un solo evento
+        document.addEventListener("selectionchange", () => {
+            const sel = window.getSelection();
+            if (!sel || sel.rangeCount === 0) return;
+            const range = sel.getRangeAt(0);
+
+            if (typeof content !== "undefined" && content.contains(range.commonAncestorContainer)) {
+                activeEditable = content;
+                savedRange = range.cloneRange();
+            } else if (typeof titleView !== "undefined" && titleView.contains(range.commonAncestorContainer)) {
+                activeEditable = titleView;
+                savedRange = range.cloneRange();
+            }
+        });
+
+        function restoreSelection() {
+            if (!activeEditable) activeEditable = content;
+            activeEditable.focus();
+            const sel = window.getSelection();
+            if (savedRange) {
+                try {
+                    sel.removeAllRanges();
+                    sel.addRange(savedRange);
+                } catch (e) {
+                    sel.selectAllChildren(activeEditable);
+                    sel.collapseToEnd();
+                }
+            }
+        }
+
+        // Lee el estilo efectivo (computado) donde está parada la selección guardada
+        function getStyleAtSelection(prop) {
+            if (!savedRange) return "";
+            let node = savedRange.startContainer;
+            let el = node.nodeType === 3 ? node.parentElement : node;
+            if (!el) return "";
+            return window.getComputedStyle(el)[prop] || "";
+        }
+
+        // Aplica estilos CSS directamente sobre la selección real (funciona con texto
+        // ya escrito y seleccionado, y también con el cursor solo para lo que se escriba después)
+        function applyStyle(styles) {
+            restoreSelection();
+            const sel = window.getSelection();
+            if (!sel || sel.rangeCount === 0) return;
+            let range = sel.getRangeAt(0);
+
+            const span = document.createElement("span");
+            Object.keys(styles).forEach(k => { span.style[k] = styles[k]; });
+
+            if (range.collapsed) {
+                // Sin texto seleccionado: preparamos el estilo para lo próximo que se escriba
+                const zwsp = document.createTextNode("\u200B");
+                span.appendChild(zwsp);
+                range.insertNode(span);
+                range.setStart(zwsp, 1);
+                range.setEnd(zwsp, 1);
+                sel.removeAllRanges();
+                sel.addRange(range);
+            } else {
+                const frag = range.extractContents();
+                span.appendChild(frag);
+                range.insertNode(span);
+
+                const newRange = document.createRange();
+                newRange.selectNodeContents(span);
+                sel.removeAllRanges();
+                sel.addRange(newRange);
+            }
+
+            savedRange = sel.getRangeAt(0).cloneRange();
+            scheduleSave();
+            updateStyleButtons();
+        }
+
+        // Prende/apaga una propiedad (negrita, cursiva, subrayado) según el estado actual
+        function toggleStyle(prop, onValue, offValue) {
+            const current = getStyleAtSelection(prop);
+            let isOn;
+
+            if (prop === "fontWeight") {
+                isOn = current === "bold" || parseInt(current) >= 600;
+            } else if (prop === "textDecorationLine" || prop === "textDecoration") {
+                isOn = (current || "").includes("underline");
+            } else {
+                isOn = current === onValue;
+            }
+
+            applyStyle({ [prop]: isOn ? offValue : onValue });
+        }
+
+        function updateStyleButtons() {
+            try {
+                const weight = getStyleAtSelection("fontWeight");
+                const style = getStyleAtSelection("fontStyle");
+                const deco = getStyleAtSelection("textDecorationLine") || getStyleAtSelection("textDecoration");
+
+                document.getElementById("boldBtn").classList.toggle("toggled", weight === "bold" || parseInt(weight) >= 600);
+                document.getElementById("italicBtn").classList.toggle("toggled", style === "italic");
+                document.getElementById("underlineBtn").classList.toggle("toggled", (deco || "").includes("underline"));
+            } catch (e) { }
+        }
 
         function renderPalette() {
             palette.innerHTML = "";
@@ -399,42 +934,111 @@
                 b.className = "colorBtn" + (c === selectedColor ? " selected" : "");
                 b.style.background = c;
 
+                b.onmousedown = (e) => e.preventDefault();
                 b.onclick = () => {
                     selectedColor = c;
-
-                    let n = notes.find(x => x.id === currentId);
-                    if (n) {
-                        n.color = c;
-                        titleView.style.color = c;
-                        saveStorage();
-                    }
-
+                    applyStyle({ color: c });
                     renderPalette();
-                    render();
                 };
 
                 palette.appendChild(b);
             });
         }
+
+        /* ================= BÚSQUEDA DENTRO DE LA NOTA ================= */
+
+        function escapeRegex(s) {
+            return s.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+        }
+
+        function clearHighlights() {
+            content.querySelectorAll("mark.pichon-hl").forEach(m => {
+                const parent = m.parentNode;
+                while (m.firstChild) parent.insertBefore(m.firstChild, m);
+                parent.removeChild(m);
+                parent.normalize();
+            });
+        }
+
+        function searchInNote() {
+            const raw = document.getElementById("noteSearch").value.trim();
+            if (!raw) return;
+
+            const words = raw.split(/\s+/).filter(Boolean).map(escapeRegex);
+            if (!words.length) return;
+
+            clearHighlights();
+
+            const regex = new RegExp("(" + words.join("|") + ")", "gi");
+
+            const walker = document.createTreeWalker(content, NodeFilter.SHOW_TEXT);
+            let node, nodes = [];
+            while ((node = walker.nextNode())) nodes.push(node);
+
+            let firstMark = null;
+
+            nodes.forEach(textNode => {
+                const text = textNode.nodeValue;
+                regex.lastIndex = 0;
+                if (!regex.test(text)) return;
+                regex.lastIndex = 0;
+
+                const frag = document.createDocumentFragment();
+                let lastIndex = 0;
+                let m;
+
+                while ((m = regex.exec(text))) {
+                    if (m.index > lastIndex) {
+                        frag.appendChild(document.createTextNode(text.slice(lastIndex, m.index)));
+                    }
+                    const mark = document.createElement("mark");
+                    mark.className = "pichon-hl";
+                    mark.textContent = m[0];
+                    frag.appendChild(mark);
+                    if (!firstMark) firstMark = mark;
+                    lastIndex = m.index + m[0].length;
+
+                    if (m.index === regex.lastIndex) regex.lastIndex++;
+                }
+
+                if (lastIndex < text.length) {
+                    frag.appendChild(document.createTextNode(text.slice(lastIndex)));
+                }
+
+                textNode.parentNode.replaceChild(frag, textNode);
+            });
+
+            if (firstMark) {
+                firstMark.scrollIntoView({ behavior: "smooth", block: "center" });
+            }
+
+            setTimeout(clearHighlights, 2300);
+        }
+
+        /* ================= EXPORTAR ================= */
+
         function downloadTXT() {
-            let n = notes.find(x => x.id === currentId);
+            let n = getCurrentNote();
             if (!n) return;
 
-            const text = `${n.title}\n\n${n.content}`;
+            const titleTxt = plainText(n.title) || "Sin título";
+            const contentTxt = plainText(n.content);
+
+            const text = `${titleTxt}\n\n${contentTxt}`;
 
             const blob = new Blob([text], { type: "text/plain" });
             const url = URL.createObjectURL(blob);
 
             const a = document.createElement("a");
             a.href = url;
-            a.download = (n.title || "nota") + ".txt";
+            a.download = (titleTxt || "nota") + ".txt";
             a.click();
 
             URL.revokeObjectURL(url);
         }
 
         /* INIT */
-        authModal.style.display = "flex";
+        start();
 
     </script>
 
