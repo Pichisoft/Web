@@ -39,6 +39,16 @@
             text-shadow: 0 2px 10px rgba(0, 0, 0, 0.8);
         }
 
+        .byline {
+            font-family: "Segoe UI", Tahoma, sans-serif;
+            font-size: 0.42em;
+            font-style: italic;
+            font-weight: 400;
+            color: rgba(240, 228, 204, 0.75);
+            letter-spacing: 0;
+            vertical-align: middle;
+        }
+
         #editBtn {
             display: block;
             margin-top: 10px;
@@ -128,7 +138,10 @@
 <body>
     <canvas id="c"></canvas>
     <div id="ui">
-        <h1><strong>PichonWatch</strong></h1>
+        <h1>
+            <strong>PichonWatch</strong>
+            <span class="byline">- By Pichisoft -</span>
+        </h1>
         <button id="editBtn">Editar</button>
         <div id="hint">Modo edición — arrastrá las agujas<br>clic derecho para salir</div>
         <div id="focusHint"></div>
