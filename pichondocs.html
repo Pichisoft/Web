@@ -334,26 +334,10 @@
         }
 
         mark.pichon-hl {
-            background: rgba(168, 85, 247, 0.85);
+            background: #a855f7;
             color: #111;
             border-radius: 3px;
             padding: 0 1px;
-            animation: pichonFill 2.2s ease forwards;
-        }
-
-        @keyframes pichonFill {
-            0% {
-                background: rgba(168, 85, 247, 0.9);
-            }
-
-            55% {
-                background: rgba(168, 85, 247, 0.9);
-            }
-
-            100% {
-                background: rgba(168, 85, 247, 0);
-                color: inherit;
-            }
         }
 
         .autosaveTag {
@@ -425,6 +409,95 @@
 
         .danger:hover {
             background: #d32323;
+        }
+
+        @media (max-width:900px) {
+
+            .bodyWrap {
+                flex-direction: column;
+            }
+
+            .sidebar {
+                width: 100%;
+                height: 220px;
+                border-right: none;
+                border-bottom: 1px solid #333;
+            }
+
+            .toolbar {
+                gap: 8px;
+            }
+
+            .toolbar button {
+                flex: 1;
+                min-width: 90px;
+            }
+
+            .noteSearchWrap {
+                width: 100%;
+            }
+
+            .titleWrap {
+                padding: 12px;
+            }
+
+            #content {
+                padding: 12px;
+                font-size: 17px;
+            }
+
+            .appHeader {
+                justify-content: center;
+                flex-wrap: wrap;
+                text-align: center;
+            }
+
+            .formatPanel {
+                width: 95vw;
+                left: 50%;
+                transform: translateX(-50%);
+            }
+
+            .customDropdown {
+                max-height: 180px;
+            }
+
+        }
+
+        @media (max-width:600px) {
+
+            .toolbar {
+                flex-direction: column;
+                align-items: stretch;
+            }
+
+            .toolbar>* {
+                width: 100%;
+            }
+
+            .newNoteBtn {
+                font-size: 16px;
+            }
+
+            .searchBox input,
+            #noteSearch {
+                font-size: 16px;
+            }
+
+            button {
+                font-size: 15px;
+                padding: 10px;
+            }
+
+            .titleText {
+                font-size: 24px;
+            }
+
+            #content {
+                font-size: 18px;
+                line-height: 1.8;
+            }
+
         }
     </style>
 </head>
@@ -525,8 +598,9 @@
                 </div>
 
                 <div class="noteSearchWrap">
-                    <input id="noteSearch" placeholder="Buscar dentro de la nota... (varias palabras)"
-                        onkeydown="if(event.key==='Enter') searchInNote()" />
+                    <input id="noteSearch"
+                        placeholder="Buscar dentro de la nota... (Enter). Click derecho para dejar de buscar."
+                        oncontextmenu="exitSearch(event)" onkeydown="if(event.key==='Enter') searchInNote()" />
                     <button onclick="searchInNote()">🔍</button>
                 </div>
 
@@ -959,6 +1033,15 @@
                 parent.normalize();
             });
         }
+        function exitSearch(e) {
+            e.preventDefault();
+
+            document.getElementById("noteSearch").value = "";
+
+            clearHighlights();
+
+            content.focus();
+        }
 
         function searchInNote() {
             const raw = document.getElementById("noteSearch").value.trim();
@@ -968,6 +1051,7 @@
             if (!words.length) return;
 
             clearHighlights();
+
 
             const regex = new RegExp("(" + words.join("|") + ")", "gi");
 
@@ -1012,7 +1096,6 @@
                 firstMark.scrollIntoView({ behavior: "smooth", block: "center" });
             }
 
-            setTimeout(clearHighlights, 2300);
         }
 
         /* ================= EXPORTAR ================= */
