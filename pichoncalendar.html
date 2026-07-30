@@ -3,16 +3,41 @@
 
 <head>
     <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0">
     <title>PichonCalendar</title>
 
     <style>
+        * {
+            box-sizing: border-box;
+        }
+
         body {
             margin: 0;
             font-family: Arial, sans-serif;
             color: white;
 
-            background: url('https://images.unsplash.com/photo-1506744038136-46273834b3fb') no-repeat center center fixed;
+            background-color: #111;
+            background-image: url('https://images.unsplash.com/photo-1506744038136-46273834b3fb?auto=format&fit=crop&w=1920&q=80');
+            background-repeat: no-repeat;
+            background-position: center center;
             background-size: cover;
+            min-height: 100vh;
+        }
+
+        .brand {
+            font-family: "Times New Roman", Times, serif;
+            font-size: 2em;
+            margin: 0;
+        }
+
+        .brand-sub {
+            font-family: Arial, sans-serif;
+            font-style: italic;
+            font-weight: normal;
+            font-size: 0.55em;
+            opacity: 0.8;
+            margin-left: 8px;
+            white-space: nowrap;
         }
 
         .overlay {
@@ -25,7 +50,7 @@
         .sidebar {
             width: 200px;
             background: rgba(0, 0, 0, 0.85);
-            padding: 20px;
+            padding: 4px 20px 20px 20px;
         }
 
         .tab {
@@ -42,7 +67,12 @@
         /* Main */
         .main {
             flex: 1;
-            padding: 20px;
+            padding: 70px 20px 20px 20px;
+        }
+
+        .main h2,
+        .main h3 {
+            margin-top: 0;
         }
 
         h1 {
@@ -110,6 +140,100 @@
             border: 1px solid white;
             padding: 5px;
         }
+
+        /* ===================== RESPONSIVE ===================== */
+
+        @media (max-width: 900px) {
+            .years {
+                grid-template-columns: repeat(3, 1fr);
+            }
+        }
+
+        @media (max-width: 768px) {
+            .overlay {
+                flex-direction: column;
+            }
+
+            .sidebar {
+                width: 100%;
+                padding: 12px;
+                display: flex;
+                flex-wrap: wrap;
+                align-items: center;
+                gap: 8px;
+            }
+
+            .sidebar h2.brand {
+                width: 100%;
+                margin: 0 0 6px 0;
+                font-size: 1.5em;
+            }
+
+            .tab {
+                flex: 1 1 auto;
+                margin-bottom: 0;
+                text-align: center;
+                font-size: 0.85em;
+            }
+
+            .main {
+                padding: 14px;
+            }
+
+            h1.brand {
+                font-size: 1.6em;
+            }
+
+            .years,
+            .months {
+                grid-template-columns: repeat(3, 1fr);
+            }
+
+            .item {
+                padding: 8px;
+                font-size: 0.9em;
+            }
+        }
+
+        @media (max-width: 480px) {
+            .sidebar h2 {
+                text-align: center;
+            }
+
+            .brand-sub {
+                display: block;
+                margin-left: 0;
+                margin-top: 2px;
+            }
+
+            .tab {
+                flex: 1 1 40%;
+            }
+
+            .years,
+            .months {
+                grid-template-columns: repeat(2, 1fr);
+            }
+
+            .days {
+                gap: 5px;
+            }
+
+            .item {
+                padding: 6px;
+                font-size: 0.8em;
+            }
+
+            .weekdays {
+                font-size: 0.75em;
+            }
+
+            input,
+            textarea,
+            button {
+                font-size: 16px;
+            }
+        }
     </style>
 
 </head>
@@ -119,7 +243,7 @@
     <div class="overlay">
 
         <div class="sidebar">
-            <h2>PichonCalendar</h2>
+            <h2 class="brand">PichonCalendar<span class="brand-sub"> - By Pichisoft -</span></h2>
             <div class="tab" onclick="showYears()">Años</div>
             <div class="tab" onclick="showMonths()">Meses</div>
             <div class="tab" onclick="showDays()">Días</div>
@@ -127,7 +251,6 @@
         </div>
 
         <div class="main">
-            <h1>PichonCalendar</h1>
             <div id="app"></div>
         </div>
 
